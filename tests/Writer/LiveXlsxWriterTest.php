@@ -63,13 +63,15 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertStringNotContainsString('basic auth', $lowerContents);
         $this->assertDoesNotMatchRegularExpression('/savepassword="1"/i', $allContents);
 
-        // Sheet rels must carry the queryTable relationship (Excel needs this to wire refresh).
-        $sheetRels = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
-        $this->assertNotFalse($sheetRels, 'sheet rels should exist');
-        $this->assertStringContainsString('rIdQueryTable1', $sheetRels);
-        $this->assertStringContainsString('queryTable', $sheetRels);
+        $this->assertFalse(
+            $zip->getFromName('xl/queryTables/queryTable1.xml'),
+            'connection-only writer must not inject query table parts'
+        );
 
-        // queryTable relationships belong only at sheet level, not in workbook rels.
+        $contentTypes = $zip->getFromName('[Content_Types].xml');
+        $this->assertNotFalse($contentTypes);
+        $this->assertStringContainsString('/xl/connections.xml', $contentTypes);
+
         $workbookRels = $zip->getFromName('xl/_rels/workbook.xml.rels');
         $this->assertNotFalse($workbookRels, 'workbook rels should exist');
         $this->assertStringNotContainsString('queryTable', $workbookRels);
@@ -215,9 +217,9 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertNotFalse($workbook);
         $this->assertStringContainsString('name="Sales_Marketing"', $workbook);
 
-        $relsContent = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
-        $this->assertNotFalse($relsContent, 'sheet rels must exist');
-        $this->assertStringContainsString('rIdQueryTable1', $relsContent);
+        $connections = $zip->getFromName('xl/connections.xml');
+        $this->assertNotFalse($connections);
+        $this->assertStringContainsString('/tenant-1/Sales_Marketing', $connections);
 
         $zip->close();
     }

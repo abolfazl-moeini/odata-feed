@@ -49,14 +49,6 @@ M;
 XML;
     }
 
-    public function buildQueryTableXml(): string
-    {
-        return <<<XML
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<queryTable xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" name="ExternalData_1" connectionId="1" headers="1" rowNumbers="0" fillFormulas="0" disableRefresh="0" backgroundRefresh="1" refreshOnLoad="0" grow="1" removeDataOnSave="0"/>
-XML;
-    }
-
     private function sanitizeQueryName(string $name): string
     {
         $sanitized = (string) preg_replace('/[^A-Za-z0-9_]/', '_', $name);

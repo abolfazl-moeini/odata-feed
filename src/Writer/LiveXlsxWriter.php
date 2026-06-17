@@ -132,11 +132,9 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         }
 
         $zip->addFromString('xl/connections.xml', $this->mashupBuilder->buildConnectionsXml($feed));
-        $zip->addFromString('xl/queryTables/queryTable1.xml', $this->mashupBuilder->buildQueryTableXml());
 
         $this->updateContentTypes($zip);
         $this->updateWorkbookRels($zip);
-        $this->updateSheetWithQueryTable($zip, $feed->getEntitySet());
 
         if (!$zip->close()) {
             throw new RuntimeException('Unable to finalize Power Query injection.');
@@ -150,15 +148,11 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             throw new RuntimeException('Missing [Content_Types].xml in workbook.');
         }
 
-        $newOverrides = [
-            'PartName="/xl/connections.xml"' => '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/>',
-            'PartName="/xl/queryTables/queryTable1.xml"' => '<Override PartName="/xl/queryTables/queryTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"/>',
-        ];
+        $partMarker = 'PartName="/xl/connections.xml"';
+        $override = '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/>';
 
-        foreach ($newOverrides as $partMarker => $override) {
-            if (strpos($content, $partMarker) === false) {
-                $content = str_replace('</Types>', $override . '</Types>', $content);
-            }
+        if (strpos($content, $partMarker) === false) {
+            $content = str_replace('</Types>', $override . '</Types>', $content);
         }
 
         $zip->addFromString('[Content_Types].xml', $content);
@@ -171,7 +165,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             throw new RuntimeException('Missing xl/_rels/workbook.xml.rels in workbook.');
         }
 
-        // queryTable relationships live in the sheet rels file, not in workbook.xml.rels.
         $relationships = [
             '<Relationship Id="rIdConnections" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" Target="connections.xml"/>',
         ];
@@ -194,39 +187,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         return null;
     }
 
-    private function updateSheetWithQueryTable(ZipArchive $zip, string $entitySet): void
-    {
-        $sheetPath = $this->resolveSheetPath($zip, $entitySet);
-        if ($sheetPath === null) {
-            return;
-        }
-
-        $content = $zip->getFromName($sheetPath);
-        if ($content === false) {
-            return;
-        }
-
-        if (strpos($content, '<queryTable') === false) {
-            $queryTableRef = '<tableParts count="1"><tablePart r:id="rIdQueryTable1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></tableParts>';
-            $content = str_replace('</worksheet>', $queryTableRef . '</worksheet>', $content);
-        }
-
-        $zip->addFromString($sheetPath, $content);
-
-        $relsPath = dirname($sheetPath) . '/_rels/' . basename($sheetPath) . '.rels';
-        $relsContent = $zip->getFromName($relsPath);
-        if ($relsContent === false) {
-            $relsContent = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
-        }
-
-        $relationship = '<Relationship Id="rIdQueryTable1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable" Target="../queryTables/queryTable1.xml"/>';
-        if (strpos($relsContent, 'rIdQueryTable1') === false) {
-            $relsContent = $this->appendRelationship($relsContent, $relationship);
-        }
-
-        $zip->addFromString($relsPath, $relsContent);
-    }
-
     private function appendRelationship(string $relsXml, string $relationship): string
     {
         // Normalize self-closing empty Relationships tag to open/close form so we can append
@@ -244,52 +204,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         }
 
         return $relsXml;
-    }
-
-    private function resolveSheetPath(ZipArchive $zip, string $entitySet): ?string
-    {
-        $workbook = $zip->getFromName('xl/workbook.xml');
-        if ($workbook === false) {
-            return null;
-        }
-
-        $rid = $this->extractSheetRid($workbook, $entitySet);
-        if ($rid === null) {
-            return 'xl/worksheets/sheet1.xml';
-        }
-
-        $rels = $zip->getFromName('xl/_rels/workbook.xml.rels');
-        if ($rels === false) {
-            return 'xl/worksheets/sheet1.xml';
-        }
-
-        if (!preg_match('/<Relationship\b[^>]*\bId="' . preg_quote($rid, '/') . '"[^>]*\bTarget="([^"]+)"/', $rels, $targetMatches)) {
-            return 'xl/worksheets/sheet1.xml';
-        }
-
-        $target = $targetMatches[1];
-
-        // Target may be absolute (/xl/worksheets/sheet1.xml) or relative (worksheets/sheet1.xml).
-        return strpos($target, '/') === 0 ? ltrim($target, '/') : 'xl/' . $target;
-    }
-
-    private function extractSheetRid(string $workbookXml, string $entitySet): ?string
-    {
-        $name = preg_quote(htmlspecialchars($entitySet, ENT_QUOTES | ENT_XML1, 'UTF-8'), '/');
-
-        // Try both attribute orderings: name-before-rid and rid-before-name.
-        foreach (
-            [
-            '/<sheet\b[^>]*\bname="' . $name . '"[^>]*\br:id="([^"]+)"/',
-            '/<sheet\b[^>]*\br:id="([^"]+)"[^>]*\bname="' . $name . '"/',
-            ] as $pattern
-        ) {
-            if (preg_match($pattern, $workbookXml, $matches)) {
-                return $matches[1];
-            }
-        }
-
-        return null;
     }
 
     private function persistFeedMetadata(FeedConfigInterface $feed): void

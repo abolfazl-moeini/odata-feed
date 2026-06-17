@@ -97,14 +97,14 @@ Pass `null` (default) to skip persistence.
 
 1. PhpSpreadsheet saves a snapshot workbook.
 2. The writer re-opens the file as a ZIP archive.
-3. Power Query parts are injected:
+3. A connection-only OData embed is injected (avoids invalid worksheet→queryTable wiring that triggers Excel repair prompts):
    - `xl/connections.xml` — OData web-query connection (`webPr` URL, `savePassword="0"`)
-   - `xl/queryTables/queryTable1.xml`
-   - `[Content_Types].xml`, `xl/_rels/workbook.xml.rels`, worksheet links
+   - `[Content_Types].xml` override for connections
+   - `xl/_rels/workbook.xml.rels` — connections relationship
 
 `entitySet` is normalized to match Package 1 entity-set identifiers (e.g. `Sales Data` → `Sales_Data`). `feedId` must match `[A-Za-z0-9_-]+`. Credentials are never stored in the file.
 
-DataMashup (`customXml/item1.xml`) is reserved for a future iteration.
+Live OData refresh requires a future Power Query DataMashup embed (table → queryTable → connection chain). The current writer ships snapshot data plus a standalone connection.
 
 ## Compatibility
 

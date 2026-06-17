@@ -42,26 +42,27 @@ Final URL: `{rtrim(baseUrl, '/')}/{feedId}/{entitySet}`
 | Part | Purpose |
 |------|---------|
 | `xl/connections.xml` | OData web-query connection (type 4, `webPr` URL) |
-| `xl/queryTables/queryTable1.xml` | Query table definition |
-| `[Content_Types].xml` | Register new parts |
+| `[Content_Types].xml` | Register connections override |
 | `xl/_rels/workbook.xml.rels` | Connection relationship |
-| `xl/worksheets/sheetN.xml` + `_rels` | Link sheet to query table |
 
-DataMashup (`customXml/item1.xml`) is reserved for a future MS-QDEFF iteration.
+**Option A (current):** connection-only — file opens cleanly in Excel; snapshot data intact; no live OData refresh yet.
+
+**Option B (future):** full Power Query embed with DataMashup + table → queryTable → connection chain for live refresh.
 
 ## Phases
 
-### Phase 1 — Connections-only writer (done)
+### Phase 1 — Connection-only writer (done)
 
-- Single Power Query connection per file
-- Snapshot data + embedded OData URL
+- Single OData connection part per file (no invalid query-table wiring)
+- Snapshot data + embedded OData URL in `connections.xml`
 - `FeedRepositoryInterface` for optional metadata persistence
+- Opens in Excel for Mac without OOXML repair prompts
 
-### Phase 2 — Future
+### Phase 2 — Power Query DataMashup (future)
 
-- Valid MS-QDEFF DataMashup binary
-- Multiple connections per workbook
-- Additional auth UX documentation for Excel credential manager
+- Valid MS-QDEFF DataMashup binary (`customXml/item1.xml`)
+- Table Definition + Query Table parts with correct relationship chain
+- Live OData refresh in Excel for Windows and Mac
 
 ## Quality gates
 

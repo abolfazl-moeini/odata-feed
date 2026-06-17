@@ -116,13 +116,10 @@ PhpSpreadsheet cannot embed Power Query natively. After the base save, these ZIP
 | Part | Purpose |
 |------|---------|
 | `xl/connections.xml` | OData web-query connection (type 4, `webPr` URL) |
-| `xl/queryTables/queryTable1.xml` | Query table definition |
-| `[Content_Types].xml` | Register new parts |
+| `[Content_Types].xml` | Register connections override |
 | `xl/_rels/workbook.xml.rels` | Connection relationship |
-| `xl/workbook.xml` | `<connections>` reference |
-| `xl/worksheets/sheetN.xml` + `_rels` | Link sheet to query table |
 
-DataMashup (`customXml/item1.xml`) is reserved for a future iteration; the current writer uses connections-only.
+The writer does **not** inject query-table or table-definition parts. Wiring a worksheet directly to a queryTable part is invalid OOXML and causes Excel repair prompts. A future DataMashup iteration will add the correct chain: worksheet → table → queryTable → connection.
 
 Embedded M formula:
 
