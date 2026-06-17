@@ -4,3 +4,4 @@
 composer.lock
 *.xlsx
 !tests/fixtures/*.xlsx
+!/resources/live-template.xlsx

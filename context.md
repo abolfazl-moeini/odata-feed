@@ -88,11 +88,14 @@ src/
 │   ├── FeedConfig.php              # validates config, throws on empty fields
 │   └── ConnectionBuilder.php       # builds OData URL
 ├── Writer/
-│   └── LiveXlsxWriter.php          # main entry: save snapshot + inject PQ parts
+│   └── LiveXlsxWriter.php          # main entry: clone template + repoint feed URL
 ├── PowerQuery/
-│   └── MashupBuilder.php           # M formula, connections.xml, DataMashup binary
+│   └── DataMashupRewriter.php      # swaps OData URL inside a real DataMashup (UTF-16 + MS-QDEFF)
 └── Repository/
     └── InMemoryFeedRepository.php  # optional feedId → metadata persistence
+
+resources/
+└── live-template.xlsx              # real Excel-authored Power Query workbook used as the base
 ```
 
 ### Key classes
@@ -109,24 +112,24 @@ Also: `LiveXlsxWriter::fromFile(string $path): self`
 
 **`FeedRepositoryInterface`** — optional DI for persisting `feedId → meta` on write. If `null`, no persistence. `InMemoryFeedRepository` is the default implementation for tests/simple use.
 
-### Power Query injection (`LiveXlsxWriter` + `MashupBuilder`)
+### Power Query embed (`LiveXlsxWriter` + `DataMashupRewriter`) — template-clone
 
-PhpSpreadsheet cannot embed Power Query natively. After the base save, these ZIP parts are added/updated:
+Hand-synthesizing the Power Query / MS-QDEFF parts repeatedly triggered Excel's "We found a problem with some content" repair prompt (Excel for Mac is especially strict). The writer therefore clones a real, Excel-authored template instead of building parts:
 
-| Part | Purpose |
-|------|---------|
-| `xl/connections.xml` | OData web-query connection (type 4, `webPr` URL) |
-| `[Content_Types].xml` | Register connections override |
-| `xl/_rels/workbook.xml.rels` | Connection relationship |
+1. `resources/live-template.xlsx` is a workbook Excel produced from an OData feed. It already has valid `xl/connections.xml`, `xl/tables/table1.xml`, `xl/queryTables/queryTable1.xml`, `customXml/item1.xml` (DataMashup), content types, relationships, and the hidden `ExternalData_1` defined name.
+2. `LiveXlsxWriter::write()` copies the template and calls `DataMashupRewriter::rewriteFeedUrl()` to repoint the OData URL. Only `customXml/item1.xml` changes; every other part stays byte-identical to a file Excel accepts.
 
-The writer does **not** inject query-table or table-definition parts. Wiring a worksheet directly to a queryTable part is invalid OOXML and causes Excel repair prompts. A future DataMashup iteration will add the correct chain: worksheet → table → queryTable → connection.
+`DataMashupRewriter` essentials:
+- `customXml/item1.xml` is **UTF-16** (with BOM) in real Excel files — decode/re-encode accordingly.
+- The feed URL lives only in `Formulas/Section1.m` inside the Package Parts OPC zip. Swap it, rebuild the inner zip, recompute the four [MS-QDEFF] top-level section lengths.
+- Changing the package invalidates the DPAPI permission bindings, so they are replaced with a single `0x00` byte (the spec fallback); Excel applies default permissions on open.
 
-Embedded M formula:
+Embedded M formula (query name kept from the template, e.g. `Query1`):
 
 ```powerquery
 section Section1;
 
-shared {EntitySet} = let
+shared Query1 = let
     Source = OData.Feed("{FULL_URL}", null, [Implementation="2.0"])
 in
     Source;
@@ -134,7 +137,7 @@ in
 
 `FeedConfig` normalizes `entitySet` via `EntitySetBuilder::normalizeIdentifier()` (from Package 1) and validates `feedId` against `[A-Za-z0-9_-]+`. `baseUrl` must not contain embedded credentials.
 
-`MashupBuilder::buildDataMashupBinary()` exists for a future MS-QDEFF implementation but is not injected by `LiveXlsxWriter`.
+Limitation: the current writer ships the template's snapshot data (data refreshes live on open/Refresh). Embedding the caller's own snapshot rows/columns is a follow-up. Regenerate the template by authoring a fresh OData Power Query connection in Excel and saving over `resources/live-template.xlsx`.
 
 ## Tests
 
@@ -153,7 +156,7 @@ Coverage expectations:
 4. After `write()` — output ZIP contains `xl/connections.xml`, OData URL with `/{feedId}/`, no stored credentials.
 5. `InMemoryFeedRepository` — save/find round-trip.
 6. Writer with `repository = null` — no error, no persistence.
-7. `MashupBuilder` — M formula and connections XML contain correct URL.
+7. `DataMashupRewriter` — repoints the OData URL inside the template DataMashup and keeps the MS-QDEFF stream well-framed.
 
 Test namespace: `WPDev\ODataFeed\Tests\`
 

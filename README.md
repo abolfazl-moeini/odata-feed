@@ -95,16 +95,16 @@ Pass `null` (default) to skip persistence.
 
 ## How it works
 
-1. PhpSpreadsheet saves a snapshot workbook.
-2. The writer re-opens the file as a ZIP archive.
-3. A connection-only OData embed is injected (avoids invalid worksheet→queryTable wiring that triggers Excel repair prompts):
-   - `xl/connections.xml` — OData web-query connection (`webPr` URL, `savePassword="0"`)
-   - `[Content_Types].xml` override for connections
-   - `xl/_rels/workbook.xml.rels` — connections relationship
+Hand-synthesizing the Power Query (MS-QDEFF) parts proved too fragile for Excel (it kept triggering the "We found a problem with some content" repair prompt, especially on Excel for Mac). Instead the writer reuses a real, Excel-authored Power Query workbook as a template:
+
+1. `resources/live-template.xlsx` is a known-good workbook that Excel itself generated from an OData feed (working `connections.xml`, `xl/tables`, `xl/queryTables`, and the `customXml/item1.xml` DataMashup).
+2. `LiveXlsxWriter` clones that template and rewrites **only** the OData feed URL inside the DataMashup's `Formulas/Section1.m` (rebuilding the inner OPC package and recomputing the MS-QDEFF section lengths). Changing the package invalidates the DPAPI permission bindings, so they are replaced with the spec's single null-byte fallback and Excel applies default permissions on open.
+
+Every other part stays byte-for-byte as Excel wrote it, so the output opens cleanly and refreshes live.
 
 `entitySet` is normalized to match Package 1 entity-set identifiers (e.g. `Sales Data` → `Sales_Data`). `feedId` must match `[A-Za-z0-9_-]+`. Credentials are never stored in the file.
 
-Live OData refresh requires a future Power Query DataMashup embed (table → queryTable → connection chain). The current writer ships snapshot data plus a standalone connection.
+To regenerate `resources/live-template.xlsx`, create a new OData Power Query connection in Excel (Data → Get Data → From OData Feed), load it to a table, save the `.xlsx`, and drop it in as the template.
 
 ## Compatibility
 
