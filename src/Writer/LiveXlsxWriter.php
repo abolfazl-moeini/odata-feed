@@ -136,7 +136,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
 
         $this->updateContentTypes($zip);
         $this->updateWorkbookRels($zip);
-        $this->updateWorkbook($zip);
         $this->updateSheetWithQueryTable($zip, $feed->getEntitySet());
 
         if (!$zip->close()) {
@@ -193,24 +192,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             return $m[1];
         }
         return null;
-    }
-
-    private function updateWorkbook(ZipArchive $zip): void
-    {
-        $content = $zip->getFromName('xl/workbook.xml');
-        if ($content === false) {
-            throw new RuntimeException('Missing xl/workbook.xml in workbook.');
-        }
-
-        if (strpos($content, '<connections>') === false) {
-            $content = str_replace(
-                '</workbook>',
-                '<connections><connection r:id="rIdConnections"/></connections></workbook>',
-                $content
-            );
-        }
-
-        $zip->addFromString('xl/workbook.xml', $content);
     }
 
     private function updateSheetWithQueryTable(ZipArchive $zip, string $entitySet): void

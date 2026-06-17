@@ -181,6 +181,14 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertStringContainsString('name="Sales"', $workbook);
         $this->assertStringNotContainsString('name="Sheet1"', $workbook);
 
+        $connections = $zip->getFromName('xl/connections.xml');
+        $this->assertNotFalse($connections);
+        $this->assertStringContainsString(
+            'https://api.example.com/odata/tenant-1/Sales',
+            $connections
+        );
+        $this->assertStringNotContainsString('<connections>', $workbook);
+
         $zip->close();
     }
 
@@ -255,12 +263,12 @@ final class LiveXlsxWriterTest extends TestCase
                 continue;
             }
 
-                foreach ($matches[1] as $target) {
-                    if (strpos($target, 'http') === 0) {
-                        continue;
-                    }
+            foreach ($matches[1] as $target) {
+                if (strpos($target, 'http') === 0) {
+                    continue;
+                }
 
-                    $resolved = $this->resolveRelationshipTarget($relsPath, $target);
+                $resolved = $this->resolveRelationshipTarget($relsPath, $target);
                 $this->assertNotFalse(
                     $zip->getFromName($resolved),
                     sprintf('Relationship target %s (from %s) must exist in the package', $resolved, $relsPath)
