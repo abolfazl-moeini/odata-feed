@@ -52,8 +52,9 @@ final class LiveXlsxWriterTest extends TestCase
 
         $connections = $zip->getFromName('xl/connections.xml');
         $this->assertNotFalse($connections, 'xl/connections.xml must exist');
-        $this->assertStringContainsString('/abc123/', $connections);
-        $this->assertStringContainsString('https://api.example.com/odata/abc123/Sales', $connections);
+        $this->assertStringContainsString('type="5"', $connections);
+        $this->assertStringContainsString('Microsoft.Mashup.OleDb.1', $connections);
+        $this->assertStringContainsString('Sales', $connections);
 
         $allContents = $this->readAllZipContents($zip);
         $lowerContents = strtolower($allContents);
@@ -63,25 +64,48 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertStringNotContainsString('basic auth', $lowerContents);
         $this->assertDoesNotMatchRegularExpression('/savepassword="1"/i', $allContents);
 
-        $this->assertFalse(
-            $zip->getFromName('xl/queryTables/queryTable1.xml'),
-            'connection-only writer must not inject query table parts'
-        );
+        $queryTable = $zip->getFromName('xl/queryTables/queryTable1.xml');
+        $this->assertNotFalse($queryTable);
+        $this->assertStringContainsString('<queryTableRefresh', $queryTable);
+        $this->assertStringContainsString('name="Product"', $queryTable);
+
+        $table = $zip->getFromName('xl/tables/table1.xml');
+        $this->assertNotFalse($table);
+        $this->assertStringContainsString('tableType="queryTable"', $table);
+        $this->assertStringContainsString('name="Product"', $table);
+
+        $tableRels = $zip->getFromName('xl/tables/_rels/table1.xml.rels');
+        $this->assertNotFalse($tableRels);
+        $this->assertStringContainsString('relationships/queryTable', $tableRels);
 
         $contentTypes = $zip->getFromName('[Content_Types].xml');
         $this->assertNotFalse($contentTypes);
         $this->assertStringContainsString('/xl/connections.xml', $contentTypes);
+        $this->assertStringContainsString('/xl/tables/table1.xml', $contentTypes);
+        $this->assertStringContainsString('/xl/queryTables/queryTable1.xml', $contentTypes);
 
         $workbookRels = $zip->getFromName('xl/_rels/workbook.xml.rels');
         $this->assertNotFalse($workbookRels, 'workbook rels should exist');
+        $this->assertStringContainsString('customXml', $workbookRels);
         $this->assertStringNotContainsString('queryTable', $workbookRels);
 
-        $this->assertFalse(
-            $zip->getFromName('customXml/item1.xml'),
-            'connections-only writer must not inject DataMashup parts'
-        );
+        $dataMashup = $zip->getFromName('customXml/item1.xml');
+        $this->assertNotFalse($dataMashup, 'customXml/item1.xml must exist');
+        $this->assertStringContainsString('<DataMashup', $dataMashup);
+        $this->assertNotEmpty($this->extractDataMashupBinary((string) $dataMashup));
+
+        $itemProps = $zip->getFromName('customXml/itemProps1.xml');
+        $this->assertNotFalse($itemProps);
+        $this->assertStringContainsString('schemas.microsoft.com/DataMashup', $itemProps);
+
+        $sheetRels = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
+        $this->assertNotFalse($sheetRels, 'sheet rels should exist');
+        $this->assertStringContainsString('rIdTable1', $sheetRels);
+        $this->assertStringContainsString('relationships/table', $sheetRels);
+        $this->assertStringNotContainsString('relationships/queryTable', $sheetRels);
 
         $this->assertOoxmlRelationshipsAreConsistent($zip);
+        $this->assertSheetTableRelationshipChain($zip);
 
         $zip->close();
     }
@@ -185,10 +209,7 @@ final class LiveXlsxWriterTest extends TestCase
 
         $connections = $zip->getFromName('xl/connections.xml');
         $this->assertNotFalse($connections);
-        $this->assertStringContainsString(
-            'https://api.example.com/odata/tenant-1/Sales',
-            $connections
-        );
+        $this->assertStringContainsString('Sales', $connections);
         $this->assertStringNotContainsString('<connections>', $workbook);
 
         $zip->close();
@@ -219,9 +240,24 @@ final class LiveXlsxWriterTest extends TestCase
 
         $connections = $zip->getFromName('xl/connections.xml');
         $this->assertNotFalse($connections);
-        $this->assertStringContainsString('/tenant-1/Sales_Marketing', $connections);
+        $this->assertStringContainsString('Sales_Marketing', $connections);
+
+        $dataMashup = $zip->getFromName('customXml/item1.xml');
+        $this->assertNotFalse($dataMashup);
+        $this->assertStringContainsString('<DataMashup', $dataMashup);
 
         $zip->close();
+    }
+
+    private function extractDataMashupBinary(string $dataMashupXml): string
+    {
+        if (!preg_match('/<DataMashup[^>]*>(.*)<\/DataMashup>/s', $dataMashupXml, $matches)) {
+            return '';
+        }
+
+        $decoded = base64_decode(trim($matches[1]), true);
+
+        return $decoded === false ? '' : $decoded;
     }
 
     private function createSampleSpreadsheet(): Spreadsheet
@@ -261,6 +297,15 @@ final class LiveXlsxWriterTest extends TestCase
             $relsXml = $zip->getFromName($relsPath);
             $this->assertNotFalse($relsXml, $relsPath . ' must be readable');
 
+            if (preg_match_all('/Type="([^"]+)"/', (string) $relsXml, $typeMatches)
+                && preg_match_all('/Target="([^"]+)"/', (string) $relsXml, $targetMatches)) {
+                foreach ($typeMatches[1] as $index => $type) {
+                    if (strpos($type, '/table') !== false && strpos($relsPath, 'worksheets/_rels/') !== false) {
+                        $this->assertStringEndsWith('/table', $type, $relsPath . ' tablePart must use table relationship type');
+                    }
+                }
+            }
+
             if (!preg_match_all('/Target="([^"]+)"/', (string) $relsXml, $matches)) {
                 continue;
             }
@@ -277,6 +322,23 @@ final class LiveXlsxWriterTest extends TestCase
                 );
             }
         }
+    }
+
+    private function assertSheetTableRelationshipChain(ZipArchive $zip): void
+    {
+        $sheetRels = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
+        $this->assertNotFalse($sheetRels);
+        $this->assertMatchesRegularExpression(
+            '/Type="[^"]*\/table"[^>]*Target="\.\.\/tables\/table1\.xml"/',
+            (string) $sheetRels
+        );
+
+        $tableRels = $zip->getFromName('xl/tables/_rels/table1.xml.rels');
+        $this->assertNotFalse($tableRels);
+        $this->assertMatchesRegularExpression(
+            '/Type="[^"]*\/queryTable"[^>]*Target="\.\.\/queryTables\/queryTable1\.xml"/',
+            (string) $tableRels
+        );
     }
 
     private function resolveRelationshipTarget(string $relsPath, string $target): string

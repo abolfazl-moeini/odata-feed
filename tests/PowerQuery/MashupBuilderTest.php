@@ -21,7 +21,7 @@ final class MashupBuilderTest extends TestCase
         $this->assertStringContainsString('[Implementation="2.0"]', $formula);
     }
 
-    public function testBuildsConnectionsXmlWithWebQueryUrl(): void
+    public function testBuildsConnectionsXmlWithPowerQueryConnection(): void
     {
         $config = new FeedConfig('https://api.example.com/odata', 'abc123', 'Sales');
         $builder = new MashupBuilder();
@@ -29,9 +29,10 @@ final class MashupBuilderTest extends TestCase
         $xml = $builder->buildConnectionsXml($config);
 
         $this->assertStringContainsString('<connections', $xml);
-        $this->assertStringContainsString('type="4"', $xml);
-        $this->assertStringContainsString('<webPr', $xml);
-        $this->assertStringContainsString('url="https://api.example.com/odata/abc123/Sales"', $xml);
+        $this->assertStringContainsString('type="5"', $xml);
+        $this->assertStringContainsString('<dbPr', $xml);
+        $this->assertStringContainsString('Microsoft.Mashup.OleDb.1', $xml);
+        $this->assertStringContainsString('Sales', $xml);
         $this->assertStringContainsString('savePassword="0"', $xml);
     }
 
@@ -45,7 +46,18 @@ final class MashupBuilderTest extends TestCase
         $this->assertStringContainsString('/f1/Sales_Data', $m);
 
         $conn = $builder->buildConnectionsXml($config);
-        $this->assertStringContainsString('url="https://api.example.com/odata/f1/Sales_Data"', $conn);
+        $this->assertStringContainsString('Sales_Data', $conn);
+
+        $table = $builder->buildTableXml(['Col1', 'Col2'], 'A1:B3');
+        $this->assertStringContainsString('tableType="queryTable"', $table);
+        $this->assertStringContainsString('name="Col1"', $table);
+
+        $queryTable = $builder->buildQueryTableXml(['Col1', 'Col2']);
+        $this->assertStringContainsString('<queryTableRefresh', $queryTable);
+        $this->assertStringContainsString('name="Col2"', $queryTable);
+
+        $dataMashup = $builder->buildDataMashupXml($config);
+        $this->assertStringContainsString('<DataMashup', $dataMashup);
     }
 
     public function testEscapesDoubleQuotesInUrlForMFormula(): void
