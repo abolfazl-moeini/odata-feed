@@ -4,7 +4,7 @@
 # Docs: https://packagist.org/about#how-to-update-packages
 #
 # Required environment variables:
-#   PACKAGIST_USERNAME  — your packagist.org username
+#   PACKAGIST_USERNAME  — packagist.org username (default: wpdev)
 #   PACKAGIST_API_TOKEN — API token from https://packagist.org/profile/
 #   GITHUB_TOKEN        — GitHub PAT with "Webhooks" write access on this repo
 #
@@ -12,14 +12,14 @@
 #   GITHUB_REPO         — owner/repo (auto-detected from git remote if omitted)
 #
 # Usage:
-#   export PACKAGIST_USERNAME=yourname
+#   export PACKAGIST_USERNAME=wpdev   # optional, this is the default
 #   export PACKAGIST_API_TOKEN=xxxxxxxx
 #   export GITHUB_TOKEN=ghp_xxxxxxxx
 #   ./scripts/setup-packagist-github-hook.sh
 
 set -euo pipefail
 
-: "${PACKAGIST_USERNAME:?Set PACKAGIST_USERNAME}"
+PACKAGIST_USERNAME="${PACKAGIST_USERNAME:-wpdev}"
 : "${PACKAGIST_API_TOKEN:?Set PACKAGIST_API_TOKEN}"
 : "${GITHUB_TOKEN:?Set GITHUB_TOKEN}"
 
