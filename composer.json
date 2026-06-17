@@ -1,0 +1,26 @@
+{
+    "name": "wpdev/odata-feed",
+    "description": "Embeds a Power Query OData connection into PhpSpreadsheet workbooks for live Excel refresh",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.1",
+        "phpoffice/phpspreadsheet": "^2.0|^3.0|^4.0|^5.0",
+        "ext-zip": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5|^11.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "WPDev\\ODataFeed\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WPDev\\ODataFeed\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
