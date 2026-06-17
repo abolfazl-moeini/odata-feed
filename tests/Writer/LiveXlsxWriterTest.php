@@ -278,6 +278,8 @@ final class LiveXlsxWriterTest extends TestCase
         $metadata = DataMashupTemplate::parseMetadataField($sections['metadata']);
         $this->assertSame(0, $metadata['version']);
         $this->assertStringContainsString('LocalPackageMetadataFile', $metadata['metadataXml']);
+        $this->assertStringContainsString('StableEntries', $metadata['metadataXml']);
+        $this->assertStringNotContainsString('FormulaItem', $metadata['metadataXml']);
 
         $extracted = DataMashupTemplate::extractPackageFormula($sections['packageParts']);
         $this->assertContains('[Content_Types].xml', $extracted['names']);

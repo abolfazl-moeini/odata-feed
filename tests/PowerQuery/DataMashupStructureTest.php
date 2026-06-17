@@ -14,14 +14,21 @@ use ZipArchive;
 
 final class DataMashupStructureTest extends TestCase
 {
-    public function testTemplateFixtureIsStructurallyValid(): void
+    public function testScratchBuilderUsesMsQdeffMetadataSchema(): void
     {
-        $path = DataMashupTemplate::defaultPath();
-        $this->assertFileExists($path);
+        $config = new FeedConfig('https://api.example.com/odata', 'abc123', 'Sales');
+        $builder = new MashupBuilder();
+        $binary = $builder->buildDataMashupBinaryFromScratch($config);
 
-        $sections = DataMashupTemplate::parseTopLevel((string) file_get_contents($path));
-        $this->assertPackagePartsAreValidZip($sections['packageParts']);
-        $this->assertGreaterThanOrEqual(1, strlen($sections['permissionBindings']));
+        $sections = DataMashupTemplate::parseTopLevel($binary);
+        $metadata = DataMashupTemplate::parseMetadataField($sections['metadata']);
+
+        $this->assertStringContainsString('<ItemType>AllFormulas</ItemType>', $metadata['metadataXml']);
+        $this->assertStringContainsString('<ItemType>Formula</ItemType>', $metadata['metadataXml']);
+        $this->assertStringContainsString('<StableEntries>', $metadata['metadataXml']);
+        $this->assertStringContainsString('Type="FillEnabled"', $metadata['metadataXml']);
+        $this->assertStringContainsString('Type="QueryID"', $metadata['metadataXml']);
+        $this->assertStringNotContainsString('FormulaItem', $metadata['metadataXml']);
     }
 
     public function testBuildDataMashupBinaryMatchesQdeffStructure(): void
@@ -81,7 +88,9 @@ final class DataMashupStructureTest extends TestCase
         $this->assertSame(0, $metadata['version']);
         $this->assertNotSame('', $metadata['metadataXml']);
         $this->assertStringContainsString('LocalPackageMetadataFile', $metadata['metadataXml']);
-        $this->assertGreaterThanOrEqual(1, strlen($sections['permissionBindings']));
+        $this->assertStringContainsString('StableEntries', $metadata['metadataXml']);
+        $this->assertSame(1, strlen($sections['permissionBindings']));
+        $this->assertSame("\x00", $sections['permissionBindings']);
     }
 
     private function assertPackagePartsAreValidZip(string $packageParts, ?string $expectedUrl = null): void
@@ -109,9 +118,15 @@ final class DataMashupStructureTest extends TestCase
         $formula = $zip->getFromName('Formulas/Section1.m');
         $this->assertNotFalse($formula);
         $this->assertStringContainsString('OData.Feed(', (string) $formula);
+        $this->assertStringContainsString("\r\n", (string) $formula);
         if ($expectedUrl !== null) {
             $this->assertStringContainsString($expectedUrl, (string) $formula);
         }
+
+        $packageXml = $zip->getFromName('Config/Package.xml');
+        $this->assertNotFalse($packageXml);
+        $this->assertStringContainsString('<Package xmlns="http://schemas.microsoft.com/DataMashup">', (string) $packageXml);
+        $this->assertStringNotContainsString('LocalPackageMetadataFile', (string) $packageXml);
 
         $zip->close();
         unlink($tempFile);

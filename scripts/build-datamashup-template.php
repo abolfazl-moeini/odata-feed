@@ -7,7 +7,7 @@ use WPDev\ODataFeed\PowerQuery\MashupBuilder;
 
 require dirname(__DIR__) . '/vendor/autoload.php';
 
-$builder = new MashupBuilder(null, '/dev/null/force-scratch');
+$builder = new MashupBuilder();
 $config = new FeedConfig(
     'https://example.invalid/odata',
     'template',
@@ -28,3 +28,4 @@ if (file_put_contents($output, $binary) === false) {
 }
 
 echo "Wrote {$output} (" . strlen($binary) . " bytes)\n";
+echo "Note: runtime uses Track 2 from-scratch builder; this file is for inspection only.\n";

@@ -13,12 +13,9 @@ final class MashupBuilder
 {
     private ConnectionBuilder $connectionBuilder;
 
-    private ?string $templatePath;
-
-    public function __construct(?ConnectionBuilder $connectionBuilder = null, ?string $templatePath = null)
+    public function __construct(?ConnectionBuilder $connectionBuilder = null)
     {
         $this->connectionBuilder = $connectionBuilder ?? new ConnectionBuilder();
-        $this->templatePath = $templatePath;
     }
 
     public function buildMFormula(FeedConfigInterface $config): string
@@ -27,14 +24,15 @@ final class MashupBuilder
         $urlForM = str_replace('"', '""', $url);
         $queryName = $this->sanitizeQueryName($config->getEntitySet());
 
-        return <<<M
+        return $this->normalizeLineEndings(<<<M
 section Section1;
 
 shared {$queryName} = let
     Source = OData.Feed("{$urlForM}", null, [Implementation="2.0"])
 in
     Source;
-M;
+M
+        );
     }
 
     public function buildConnectionsXml(FeedConfigInterface $config): string
@@ -136,18 +134,11 @@ XML;
 
     public function buildDataMashupBinary(FeedConfigInterface $config): string
     {
-        $templatePath = $this->templatePath ?? DataMashupTemplate::defaultPath();
-        if (is_file($templatePath)) {
-            return $this->buildDataMashupBinaryFromTemplate($config, $templatePath);
-        }
-
         return $this->buildDataMashupBinaryFromScratch($config);
     }
 
     public function buildDataMashupBinaryFromScratch(FeedConfigInterface $config): string
     {
-        $queryName = $this->sanitizeQueryName($config->getEntitySet());
-
         $packageParts = $this->createOpcZip([
             '[Content_Types].xml' => $this->buildPackageContentTypesXml(),
             'Config/Package.xml' => $this->buildPackageXml(),
@@ -155,7 +146,7 @@ XML;
         ]);
 
         $permissions = $this->buildPermissionsXml();
-        $metadata = DataMashupTemplate::buildMetadataField($this->buildMetadataXml($queryName));
+        $metadata = DataMashupTemplate::buildMetadataField($this->buildMetadataXml($config));
         $permissionBindings = "\x00";
 
         return pack('V', 0)
@@ -165,79 +156,104 @@ XML;
             . pack('V', strlen($permissionBindings)) . $permissionBindings;
     }
 
-    public function buildDataMashupBinaryFromTemplate(FeedConfigInterface $config, string $templatePath): string
-    {
-        $queryName = $this->sanitizeQueryName($config->getEntitySet());
-        $template = DataMashupTemplate::fromFile($templatePath);
-
-        return $template->build(
-            $this->buildMFormula($config),
-            $this->buildMetadataXml($queryName)
-        );
-    }
-
     private function buildPackageContentTypesXml(): string
     {
-        return <<<XML
+        return $this->normalizeLineEndings(<<<XML
 <?xml version="1.0" encoding="utf-8"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="xml" ContentType="text/xml"/>
   <Default Extension="m" ContentType="text/plain"/>
   <Override PartName="/Config/Package.xml" ContentType="text/xml"/>
+  <Override PartName="/Formulas/Section1.m" ContentType="text/plain"/>
 </Types>
-XML;
+XML
+        );
     }
 
     private function buildPackageXml(): string
     {
-        return <<<XML
+        return $this->normalizeLineEndings(<<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <Package xmlns="http://schemas.microsoft.com/DataMashup">
   <Version>1.0</Version>
   <MinVersion>1.0</MinVersion>
   <Culture>en-us</Culture>
 </Package>
-XML;
+XML
+        );
     }
 
     private function buildPermissionsXml(): string
     {
-        return <<<XML
-<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+        return $this->normalizeLineEndings(<<<XML
+<?xml version="1.0" encoding="utf-8"?>
 <PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/DataMashup">
   <CanEvaluateFuturePackages>false</CanEvaluateFuturePackages>
   <FirewallEnabled>true</FirewallEnabled>
-  <WorkbookGroupType xsi:nil="true"/>
+  <WorkbookGroupType xsi:nil="true" />
 </PermissionList>
-XML;
+XML
+        );
     }
 
-    private function buildMetadataXml(string $queryName): string
+    private function buildMetadataXml(FeedConfigInterface $config): string
     {
-        $formulaName = 'Section1/' . $queryName;
+        $queryName = $this->sanitizeQueryName($config->getEntitySet());
+        $formulaPath = 'Section1/' . $queryName;
+        $sheetName = $config->getEntitySet();
+        $queryId = $this->generateGuid();
 
-        return <<<XML
+        $entries = [
+            ['IsPrivate', 'l0'],
+            ['ResultType', 'sTable'],
+            ['FillEnabled', 'l1'],
+            ['FillToDataModelEnabled', 'l0'],
+            ['FillCount', 'l0'],
+            ['FillErrorCount', 'l0'],
+            ['FillColumnTypes', 's'],
+            ['FillColumnNames', 's[]'],
+            ['FillErrorCode', 'sUnknown'],
+            ['FilledCompleteResultToWorksheet', 'l1'],
+            ['AddedToDataModel', 'l0'],
+            ['RecoveryTargetSheet', 's' . $sheetName],
+            ['RecoveryTargetColumn', 'l1'],
+            ['RecoveryTargetRow', 'l1'],
+            ['FillTarget', 'sExternalData_1'],
+            ['BufferNextRefresh', 'l1'],
+            ['NameUpdatedAfterFill', 'l0'],
+            ['FillStatus', 'sComplete'],
+            ['QueryID', 's' . $queryId],
+        ];
+
+        $entryXml = '';
+        foreach ($entries as [$type, $value]) {
+            $entryXml .= '<Entry Type="' . $type . '" Value="' . $this->escapeXml($value) . '"/>';
+        }
+
+        return $this->normalizeLineEndings(<<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <LocalPackageMetadataFile xmlns="http://schemas.microsoft.com/DataMashup">
   <Items>
     <Item>
       <ItemLocation>
-        <ItemType>Formula</ItemType>
-        <ItemPath>{$formulaName}</ItemPath>
+        <ItemType>AllFormulas</ItemType>
+        <ItemPath />
       </ItemLocation>
+      <StableEntries />
+    </Item>
+    <Item>
+      <ItemLocation>
+        <ItemType>Formula</ItemType>
+        <ItemPath>{$formulaPath}</ItemPath>
+      </ItemLocation>
+      <StableEntries>
+        {$entryXml}
+      </StableEntries>
     </Item>
   </Items>
-  <Formulas>
-    <FormulaItem>
-      <Name>{$formulaName}</Name>
-      <ContentType>x-ms/mdso</ContentType>
-      <IsEvaluable>true</IsEvaluable>
-      <LoadToReport>true</LoadToReport>
-      <IsQuery>true</IsQuery>
-    </FormulaItem>
-  </Formulas>
 </LocalPackageMetadataFile>
-XML;
+XML
+        );
     }
 
     /**
@@ -271,6 +287,13 @@ XML;
         }
 
         return $content;
+    }
+
+    private function normalizeLineEndings(string $text): string
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+
+        return str_replace("\n", "\r\n", $text);
     }
 
     private function sanitizeQueryName(string $name): string
