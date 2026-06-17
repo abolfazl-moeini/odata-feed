@@ -3,7 +3,7 @@
     "description": "Embeds a Power Query OData connection into PhpSpreadsheet workbooks for live Excel refresh",
     "type": "library",
     "version": "1.0.0",
-    "license": "MIT",
+    "license": "GPL-2.0-or-later",
     "keywords": [
         "odata",
         "power-query",
