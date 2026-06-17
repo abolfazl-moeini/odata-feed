@@ -39,21 +39,14 @@ M;
     {
         $url = $this->connectionBuilder->buildUrl($config);
         $urlXml = $this->escapeXml($url);
-        $queryName = $this->escapeXml($this->sanitizeQueryName($config->getEntitySet()));
-        $connectionName = $this->escapeXml('Query - ' . $config->getEntitySet());
+        $connectionName = $this->escapeXml('OData - ' . $config->getEntitySet());
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- OData source: {$url} -->
 <connections xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <connection id="1" name="{$connectionName}" type="5" refreshedVersion="8" background="1" saveData="1" savePassword="0">
-    <dbPr connection="Provider=Microsoft.Mashup.OleDb.1;Data Source=\$Workbook\$;Location={$queryName};Extended Properties=&quot;&quot;" command="{$queryName}" commandType="0"/>
-    <parameters/>
-    <extLst>
-      <ext uri="{AB39BE4F-830E-4394-839B-26F6AB2285C3}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main">
-        <x15:connection id="" model="1" excludeFromRefreshAll="0"/>
-      </ext>
-    </extLst>
+  <connection id="1" name="{$connectionName}" type="4" refreshedVersion="8" background="1" saveData="1" savePassword="0">
+    <webPr SourceData="0" parsePre="0" consecutive="0" url="{$urlXml}" htmlTables="0"/>
   </connection>
 </connections>
 XML;
@@ -67,6 +60,10 @@ XML;
 XML;
     }
 
+    /**
+     * Reserved for a future DataMashup (MS-QDEFF) implementation.
+     * The current writer uses connections.xml web-query fallback only.
+     */
     public function buildDataMashupBinary(FeedConfigInterface $config): string
     {
         $queryName = $this->sanitizeQueryName($config->getEntitySet());

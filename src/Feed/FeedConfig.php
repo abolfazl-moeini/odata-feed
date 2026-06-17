@@ -6,6 +6,7 @@ namespace WPDev\ODataFeed\Feed;
 
 use InvalidArgumentException;
 use WPDev\ODataFeed\Contracts\FeedConfigInterface;
+use WPDev\PhpSpreadsheetOData\OData\EntitySetBuilder;
 
 final class FeedConfig implements FeedConfigInterface
 {
@@ -33,9 +34,18 @@ final class FeedConfig implements FeedConfigInterface
             throw new InvalidArgumentException('entitySet must not be empty.');
         }
 
+        if (!preg_match('/^[A-Za-z0-9_-]+$/', $feedId)) {
+            throw new InvalidArgumentException('feedId must match [A-Za-z0-9_-]+.');
+        }
+
+        $user = parse_url($baseUrl, PHP_URL_USER);
+        if (is_string($user) && $user !== '') {
+            throw new InvalidArgumentException('baseUrl must not contain credentials.');
+        }
+
         $this->baseUrl = $baseUrl;
         $this->feedId = $feedId;
-        $this->entitySet = $entitySet;
+        $this->entitySet = EntitySetBuilder::normalizeIdentifier($entitySet);
     }
 
     public function getBaseUrl(): string

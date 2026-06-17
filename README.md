@@ -6,7 +6,7 @@ This package is **Package 2** in the excel-kit stack. It pairs with the OData en
 
 ## Requirements
 
-- **PHP 7.4 or greater** (minimum PHP 7.4; must remain compatible with PHP 7.4+)
+- **PHP 8.1 or greater**
 - `ext-zip`
 - [phpoffice/phpspreadsheet](https://github.com/PHPOffice/PhpSpreadsheet)
 
@@ -98,19 +98,13 @@ Pass `null` (default) to skip persistence.
 1. PhpSpreadsheet saves a snapshot workbook.
 2. The writer re-opens the file as a ZIP archive.
 3. Power Query parts are injected:
-   - `xl/connections.xml` — OData/Mashup connection
+   - `xl/connections.xml` — OData web-query connection (`webPr` URL, `savePassword="0"`)
    - `xl/queryTables/queryTable1.xml`
-   - `customXml/item1.xml` — DataMashup blob with the M formula
    - `[Content_Types].xml`, `xl/_rels/workbook.xml.rels`, worksheet links
 
-The embedded M formula:
+`entitySet` is normalized to match Package 1 entity-set identifiers (e.g. `Sales Data` → `Sales_Data`). `feedId` must match `[A-Za-z0-9_-]+`. Credentials are never stored in the file.
 
-```powerquery
-let
-    Source = OData.Feed("{FULL_URL}", null, [Implementation="2.0"])
-in
-    Source
-```
+DataMashup (`customXml/item1.xml`) is reserved for a future iteration.
 
 ## Compatibility
 

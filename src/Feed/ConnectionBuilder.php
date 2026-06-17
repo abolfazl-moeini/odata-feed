@@ -12,12 +12,8 @@ final class ConnectionBuilder
     {
         $baseUrl = rtrim($config->getBaseUrl(), '/');
         $feedId = $config->getFeedId();
-        $entitySet = rawurlencode($config->getEntitySet());
+        $entitySet = $config->getEntitySet();
 
-        return $baseUrl
-            . '/'
-            . $feedId
-            . '/'
-            . $entitySet;
+        return $baseUrl . '/' . $feedId . '/' . $entitySet;
     }
 }

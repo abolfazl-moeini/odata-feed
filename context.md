@@ -11,16 +11,15 @@ When a user opens the file in Excel and clicks **Refresh**, Excel re-fetches liv
 - **Composer package:** `wpdev/odata-feed`
 - **Namespace:** `WPDev\ODataFeed`
 - **GitHub:** `git@github.com:abolfazl-moeini/odata-feed.git`
-- **PHP:** **7.4 minimum** — must be compatible with **PHP 7.4 or greater** (7.4, 8.0, 8.1, 8.2, …)
+- **PHP:** **8.1 minimum** (`composer.json`: `"php": ">=8.1"`)
 - PSR-4, PSR-12
 - **No** Laravel/Symfony dependency
 
 ## PHP version requirement (critical)
 
-- **Minimum PHP version: 7.4**
-- All code, dependencies choices, and syntax **must** run on PHP 7.4+.
-- Do **not** use PHP 8-only features without a 7.4 fallback (e.g. no `str_contains`, `match`, union types, constructor promotion, `readonly`, or attributes unless polyfilled).
-- `composer.json` constraint: `"php": ">=7.4"`
+- **Minimum PHP version: 8.1**
+- `composer.json` constraint: `"php": ">=8.1"`
+- CI tests PHP 8.1–8.4
 
 ## Companion package (Package 1)
 
@@ -116,14 +115,14 @@ PhpSpreadsheet cannot embed Power Query natively. After the base save, these ZIP
 
 | Part | Purpose |
 |------|---------|
-| `xl/connections.xml` | Mashup/OData connection (type 5) |
+| `xl/connections.xml` | OData web-query connection (type 4, `webPr` URL) |
 | `xl/queryTables/queryTable1.xml` | Query table definition |
-| `customXml/item1.xml` | DataMashup blob (base64 MS-QDEFF binary) |
-| `customXml/_rels/item1.xml.rels` | DataMashup relationship |
 | `[Content_Types].xml` | Register new parts |
-| `xl/_rels/workbook.xml.rels` | Connection + query table + customXml rels |
+| `xl/_rels/workbook.xml.rels` | Connection relationship |
 | `xl/workbook.xml` | `<connections>` reference |
 | `xl/worksheets/sheetN.xml` + `_rels` | Link sheet to query table |
+
+DataMashup (`customXml/item1.xml`) is reserved for a future iteration; the current writer uses connections-only.
 
 Embedded M formula:
 
@@ -136,9 +135,9 @@ in
     Source;
 ```
 
-`MashupBuilder` builds the MS-QDEFF binary stream (Package Parts → Permissions → Metadata → Permission Bindings) per Microsoft's Query Definition File Format.
+`FeedConfig` normalizes `entitySet` via `EntitySetBuilder::normalizeIdentifier()` (from Package 1) and validates `feedId` against `[A-Za-z0-9_-]+`. `baseUrl` must not contain embedded credentials.
 
-**Implementation note:** Both `connections.xml` (Mashup OLEDB + `webPr` URL) and `customXml` DataMashup are injected. A simpler connections-only fallback was acceptable for an initial iteration; the current code includes DataMashup.
+`MashupBuilder::buildDataMashupBinary()` exists for a future MS-QDEFF implementation but is not injected by `LiveXlsxWriter`.
 
 ## Tests
 
@@ -186,7 +185,7 @@ $writer->save('output.xlsx');
 
 ## Conventions for agents
 
-- **PHP 7.4+ compatibility is mandatory** — never raise the minimum above 7.4 without explicit approval; test that new code avoids PHP 8-only syntax.
+- **PHP 8.1+** per `composer.json`; run `composer lint` before finishing.
 - **Do not** add Laravel/Symfony/framework coupling.
 - **Do not** store credentials in generated xlsx files.
 - **Keep** `{feedId}` in the URL path segment in all connection approaches.
@@ -199,8 +198,8 @@ $writer->save('output.xlsx');
 ## Dependencies
 
 ```json
-"php": ">=7.4",
-"phpoffice/phpspreadsheet": "^1.29|^2.0|^3.0|^4.0|^5.0",
+"php": ">=8.1",
+        "phpoffice/phpspreadsheet": "^2.0|^3.0",
 "wpdev/phpspreadsheet-odata": "^1.0",
 "ext-zip": "*"
 ```

@@ -32,13 +32,13 @@ final class ConnectionBuilderTest extends TestCase
         );
     }
 
-    public function testEncodesEntitySetButNotFeedId(): void
+    public function testNormalizesEntitySetInUrlButNotFeedId(): void
     {
         $config = new FeedConfig('https://api.example.com/odata', 'tenant-1', 'Sales/Data');
         $builder = new ConnectionBuilder();
 
         $this->assertSame(
-            'https://api.example.com/odata/tenant-1/Sales%2FData',
+            'https://api.example.com/odata/tenant-1/Sales_Data',
             $builder->buildUrl($config)
         );
     }

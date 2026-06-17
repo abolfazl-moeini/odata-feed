@@ -45,4 +45,23 @@ final class FeedConfigTest extends TestCase
         $this->assertSame('id1', $config->getFeedId());
         $this->assertSame('Ent', $config->getEntitySet());
     }
+
+    public function testRejectsInvalidFeedIdPattern(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new FeedConfig('https://api.example.com/odata', 'abc/def', 'Sales');
+    }
+
+    public function testRejectsBaseUrlWithCredentials(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        new FeedConfig('https://user:pass@api.example.com/odata', 'abc123', 'Sales');
+    }
+
+    public function testNormalizesEntitySetToMatchServerIdentifiers(): void
+    {
+        $config = new FeedConfig('https://api.example.com/odata', 'abc123', 'Sales Data');
+
+        $this->assertSame('Sales_Data', $config->getEntitySet());
+    }
 }

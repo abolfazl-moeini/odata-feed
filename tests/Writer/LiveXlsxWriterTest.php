@@ -74,15 +74,26 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertNotFalse($workbookRels, 'workbook rels should exist');
         $this->assertStringNotContainsString('queryTable', $workbookRels);
 
-        // customXml/item1.xml must contain the raw DataMashup binary, not a base64-wrapped XML document.
-        $dataMashup = $zip->getFromName('customXml/item1.xml');
-        $this->assertNotFalse($dataMashup, 'customXml/item1.xml must exist');
-        $this->assertNotSame('<?xml', substr((string) $dataMashup, 0, 5), 'DataMashup part must be raw binary, not XML');
+        $this->assertFalse(
+            $zip->getFromName('customXml/item1.xml'),
+            'connections-only writer must not inject DataMashup parts'
+        );
 
-        // No broken rels pointing to a non-existent DataMashup "bin" entry.
-        $this->assertFalse($zip->getFromName('customXml/_rels/item1.xml.rels'), 'should not create customXml rels to non-existent bin');
+        $this->assertOoxmlRelationshipsAreConsistent($zip);
 
         $zip->close();
+    }
+
+    public function testRejectsFeedConfigWithCredentialsInBaseUrl(): void
+    {
+        $spreadsheet = $this->createSampleSpreadsheet();
+        $output = $this->tempDir . '/cred-reject.xlsx';
+
+        $writer = new LiveXlsxWriter($spreadsheet);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $writer->setFeed(new FeedConfig('https://fake:secret@api.example.com/odata', 'abc123', 'Sales'));
+        $writer->write($output);
     }
 
     public function testWriteWithNullRepositoryDoesNotPersistAndDoesNotError(): void
@@ -173,11 +184,11 @@ final class LiveXlsxWriterTest extends TestCase
         $zip->close();
     }
 
-    public function testResolvesSheetPathWithXmlSpecialCharacters(): void
+    public function testNormalizesSheetTitleForSpecialCharacters(): void
     {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
-        $sheet->setTitle('Sales & Marketing');
+        $sheet->setTitle('Sheet1');
         $sheet->fromArray(['Col1', 'Col2'], null, 'A1');
 
         $config = new FeedConfig('https://api.example.com/odata', 'tenant-1', 'Sales & Marketing');
@@ -191,6 +202,10 @@ final class LiveXlsxWriterTest extends TestCase
 
         $zip = new ZipArchive();
         $this->assertTrue($zip->open($output) === true);
+
+        $workbook = $zip->getFromName('xl/workbook.xml');
+        $this->assertNotFalse($workbook);
+        $this->assertStringContainsString('name="Sales_Marketing"', $workbook);
 
         $relsContent = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
         $this->assertNotFalse($relsContent, 'sheet rels must exist');
@@ -217,6 +232,72 @@ final class LiveXlsxWriterTest extends TestCase
         (new XlsxWriter($spreadsheet))->save($path);
 
         return $path;
+    }
+
+    private function assertOoxmlRelationshipsAreConsistent(ZipArchive $zip): void
+    {
+        $relsFiles = [];
+
+        for ($i = 0; $i < $zip->numFiles; ++$i) {
+            $name = $zip->getNameIndex($i);
+            if ($name !== false && preg_match('#\.rels$#', $name)) {
+                $relsFiles[] = $name;
+            }
+        }
+
+        $this->assertNotEmpty($relsFiles, 'workbook should contain relationship parts');
+
+        foreach ($relsFiles as $relsPath) {
+            $relsXml = $zip->getFromName($relsPath);
+            $this->assertNotFalse($relsXml, $relsPath . ' must be readable');
+
+            if (!preg_match_all('/Target="([^"]+)"/', (string) $relsXml, $matches)) {
+                continue;
+            }
+
+                foreach ($matches[1] as $target) {
+                    if (strpos($target, 'http') === 0) {
+                        continue;
+                    }
+
+                    $resolved = $this->resolveRelationshipTarget($relsPath, $target);
+                $this->assertNotFalse(
+                    $zip->getFromName($resolved),
+                    sprintf('Relationship target %s (from %s) must exist in the package', $resolved, $relsPath)
+                );
+            }
+        }
+    }
+
+    private function resolveRelationshipTarget(string $relsPath, string $target): string
+    {
+        if (strpos($target, '/') === 0) {
+            return ltrim($target, '/');
+        }
+
+        if ($relsPath === '_rels/.rels') {
+            return $target;
+        }
+
+        $baseDir = (string) preg_replace('#/_rels/[^/]+\.rels$#', '', $relsPath);
+
+        $parts = explode('/', ($baseDir !== '' ? $baseDir . '/' : '') . $target);
+        $resolved = [];
+
+        foreach ($parts as $part) {
+            if ($part === '' || $part === '.') {
+                continue;
+            }
+
+            if ($part === '..') {
+                array_pop($resolved);
+                continue;
+            }
+
+            $resolved[] = $part;
+        }
+
+        return implode('/', $resolved);
     }
 
     private function readAllZipContents(ZipArchive $zip): string

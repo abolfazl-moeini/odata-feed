@@ -133,9 +133,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
 
         $zip->addFromString('xl/connections.xml', $this->mashupBuilder->buildConnectionsXml($feed));
         $zip->addFromString('xl/queryTables/queryTable1.xml', $this->mashupBuilder->buildQueryTableXml());
-        // customXml/item1.xml holds the raw DataMashup binary (not XML); the file extension
-        // is required by the OPC spec but the content is opaque binary understood only by Excel.
-        $zip->addFromString('customXml/item1.xml', $this->mashupBuilder->buildDataMashupBinary($feed));
 
         $this->updateContentTypes($zip);
         $this->updateWorkbookRels($zip);
@@ -157,7 +154,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         $newOverrides = [
             'PartName="/xl/connections.xml"' => '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/>',
             'PartName="/xl/queryTables/queryTable1.xml"' => '<Override PartName="/xl/queryTables/queryTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"/>',
-            'PartName="/customXml/item1.xml"' => '<Override PartName="/customXml/item1.xml" ContentType="application/vnd.ms-excel.dataMashup"/>',
         ];
 
         foreach ($newOverrides as $partMarker => $override) {
@@ -179,7 +175,6 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         // queryTable relationships live in the sheet rels file, not in workbook.xml.rels.
         $relationships = [
             '<Relationship Id="rIdConnections" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" Target="connections.xml"/>',
-            '<Relationship Id="rIdCustomXml1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/>',
         ];
 
         foreach ($relationships as $relationship) {

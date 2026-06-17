@@ -21,7 +21,7 @@ final class MashupBuilderTest extends TestCase
         $this->assertStringContainsString('[Implementation="2.0"]', $formula);
     }
 
-    public function testBuildsConnectionsXmlReferencingQuery(): void
+    public function testBuildsConnectionsXmlWithWebQueryUrl(): void
     {
         $config = new FeedConfig('https://api.example.com/odata', 'abc123', 'Sales');
         $builder = new MashupBuilder();
@@ -29,20 +29,23 @@ final class MashupBuilderTest extends TestCase
         $xml = $builder->buildConnectionsXml($config);
 
         $this->assertStringContainsString('<connections', $xml);
-        $this->assertStringContainsString('Location=Sales', $xml);
-        $this->assertStringContainsString('https://api.example.com/odata/abc123/Sales', $xml);
+        $this->assertStringContainsString('type="4"', $xml);
+        $this->assertStringContainsString('<webPr', $xml);
+        $this->assertStringContainsString('url="https://api.example.com/odata/abc123/Sales"', $xml);
+        $this->assertStringContainsString('savePassword="0"', $xml);
     }
 
-    public function testSanitizesEntitySetWithSpacesAndSpecialChars(): void
+    public function testUsesNormalizedEntitySetInMFormulaAndConnections(): void
     {
         $config = new FeedConfig('https://api.example.com/odata', 'f1', 'Sales Data!');
         $builder = new MashupBuilder();
 
         $m = $builder->buildMFormula($config);
-        $this->assertStringContainsString('shared Sales_Data_ =', $m);
+        $this->assertStringContainsString('shared Sales_Data =', $m);
+        $this->assertStringContainsString('/f1/Sales_Data', $m);
 
         $conn = $builder->buildConnectionsXml($config);
-        $this->assertStringContainsString('Location=Sales_Data_', $conn);
+        $this->assertStringContainsString('url="https://api.example.com/odata/f1/Sales_Data"', $conn);
     }
 
     public function testEscapesDoubleQuotesInUrlForMFormula(): void
