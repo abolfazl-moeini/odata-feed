@@ -26,8 +26,7 @@ php -S localhost:8080 playground.php
 
 1. Open `playground.xlsx` in Excel.
 2. **Data → Refresh All** — Excel prompts for **Basic** credentials (`demo` / `demo` by default).
-3. Edit the `$feeds` array in `playground.php`, save the file.
-4. Refresh Excel again — rows update without rebuilding the workbook.
+3. Refresh again — each pull returns newly generated random rows from the server.
 
 ## Authentication
 
@@ -56,27 +55,16 @@ curl -i http://localhost:8080/odata/demo/Employees | grep -iE 'HTTP/|WWW-Authent
 curl -i -u demo:demo http://localhost:8080/odata/demo/Employees | head -1
 ```
 
-## Edit feed data
+## Random feed data
 
-Change values in the `$feeds` array at the top of `playground.php`:
+`playground.php` generates random `Employees` and `Products` rows on every OData request. Tune row counts at the top of the file:
 
 ```php
-$feeds = [
-    'demo' => [
-        'Employees' => [
-            ['Id', 'Name', 'Age', 'Department'],
-            [1, 'Alice', 30, 'Engineering'],
-            // ...
-        ],
-        'Products' => [
-            ['Sku', 'Title', 'Price', 'InStock'],
-            // ...
-        ],
-    ],
-];
+const PLAYGROUND_EMPLOYEE_COUNT = 8;
+const PLAYGROUND_PRODUCT_COUNT = 6;
 ```
 
-The server reads `$feeds` on every request, so OData and Excel refresh pick up changes immediately.
+To customize the generator, edit `generateFeeds()` in `playground.php` (name pools, departments, price ranges, etc.).
 
 ## When to re-run `--build`
 

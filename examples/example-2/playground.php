@@ -17,16 +17,13 @@ if (PHP_SAPI !== 'cli') {
 /**
  * odata-feed live refresh playground (example-2)
  *
- * Edit the $feeds array below, then:
- *
  *   composer install
  *   php playground.php --build          # (re)generate playground.xlsx
  *   php -S localhost:8080 playground.php
  *
  * Open playground.xlsx in Excel → Data → Refresh All (enter Basic credentials).
- * Change the arrays, save this file, refresh Excel again — no rebuild needed
- * for OData (the server reads $feeds on every request). Re-run --build only
- * if you change sheet names, feedId, or the OData base URL/port.
+ * Each refresh pulls newly generated random rows from the server. Re-run --build
+ * only if you change sheet names, feedId, row counts, or the OData base URL/port.
  *
  * For subdirectory or remote hosting during --build, pass a base URL:
  *   php playground.php --build --base-url=http://localhost:8080
@@ -48,6 +45,8 @@ require __DIR__ . '/vendor/autoload.php';
 
 const PLAYGROUND_FEED_ID = 'demo';
 const PLAYGROUND_PORT = 8080;
+const PLAYGROUND_EMPLOYEE_COUNT = 8;
+const PLAYGROUND_PRODUCT_COUNT = 6;
 
 /**
  * HTTP Basic credentials for the OData feed. Excel prompts on refresh; credentials
@@ -66,31 +65,50 @@ if ($envPass !== false && $envPass !== '') {
     $password = $envPass;
 }
 
-/** @var array<string, array<string, list<list<mixed>>>> */
-$feeds = [
-    PLAYGROUND_FEED_ID => [
-        'Employees' => [
-            ['Id', 'Name', 'Age', 'Department'],
-            [1, 'Alice', 30, 'Engineering'],
-            [2, 'Bob', 25, 'Sales'],
-            [3, 'Charlie', 35, 'Engineering'],
-            [4, 'Diana', 28, 'Marketing'],
-        ],
-        'Products' => [
-            ['Sku', 'Title', 'Price', 'InStock'],
-            ['W-100', 'Widget', 9.99, true],
-            ['G-200', 'Gadget', 14.50, true],
-            ['S-300', 'Sprocket', 3.25, false],
-        ],
-    ],
-];
-
 /** @var string|null */
 $playgroundCliBaseUrl = null;
 
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/**
+ * @return array<string, array<string, list<list<mixed>>>>
+ */
+function generateFeeds(): array
+{
+    $firstNames = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack'];
+    $lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Wilson', 'Moore'];
+    $departments = ['Engineering', 'Sales', 'Marketing', 'Support', 'Finance', 'Operations'];
+    $productTitles = ['Widget', 'Gadget', 'Sprocket', 'Gizmo', 'Module', 'Adapter', 'Connector', 'Sensor'];
+
+    $employees = [['Id', 'Name', 'Age', 'Department']];
+    for ($id = 1; $id <= PLAYGROUND_EMPLOYEE_COUNT; $id++) {
+        $employees[] = [
+            $id,
+            $firstNames[array_rand($firstNames)] . ' ' . $lastNames[array_rand($lastNames)],
+            random_int(22, 60),
+            $departments[array_rand($departments)],
+        ];
+    }
+
+    $products = [['Sku', 'Title', 'Price', 'InStock']];
+    for ($i = 0; $i < PLAYGROUND_PRODUCT_COUNT; $i++) {
+        $products[] = [
+            chr(random_int(65, 90)) . '-' . random_int(100, 999),
+            $productTitles[array_rand($productTitles)],
+            round(random_int(199, 4999) / 100, 2),
+            (bool) random_int(0, 1),
+        ];
+    }
+
+    return [
+        PLAYGROUND_FEED_ID => [
+            'Employees' => $employees,
+            'Products' => $products,
+        ],
+    ];
+}
 
 /**
  * @param array<string, list<list<mixed>>> $sheets
@@ -297,7 +315,7 @@ function renderHomePage(array $feeds, string $username): void
     echo 'a{color:#2563eb}ol li{margin:.5rem 0}</style></head><body>';
 
     echo '<h1>odata-feed playground</h1>';
-    echo '<p>Edit <code>$feeds</code> in <code>playground.php</code>, save, then refresh Excel.</p>';
+    echo '<p>Feed data is <strong>generated randomly on every request</strong>. Refresh Excel to see new rows.</p>';
     echo '<p>OData is protected with <strong>HTTP Basic</strong> auth (user <code>'
         . htmlspecialchars($username, ENT_QUOTES) . '</code>). Excel prompts on refresh.</p>';
 
@@ -324,10 +342,10 @@ function renderHomePage(array $feeds, string $username): void
     echo '<li>Run <code>php -S localhost:' . PLAYGROUND_PORT . ' playground.php</code> locally (or deploy with <code>.htaccess</code>)</li>';
     echo '<li>Open <code>playground.xlsx</code> in Excel</li>';
     echo '<li><strong>Data → Refresh All</strong> — enter Basic credentials when prompted</li>';
-    echo '<li>Change a value in <code>$feeds</code> above, save <code>playground.php</code>, refresh again</li>';
+    echo '<li>Refresh again — each pull returns newly generated random data</li>';
     echo '</ol>';
 
-    echo '<h2>Current feed data (preview)</h2><pre>';
+    echo '<h2>Current feed snapshot (preview)</h2><pre>';
     echo htmlspecialchars(json_encode($feeds, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES), ENT_QUOTES);
     echo '</pre>';
 
@@ -353,9 +371,8 @@ function parseCliBaseUrl(array $argv): ?string
 
 /**
  * @param list<string> $argv
- * @param array<string, array<string, list<list<mixed>>>> $feeds
  */
-function runCli(array $argv, array $feeds): void
+function runCli(array $argv): void
 {
     global $playgroundCliBaseUrl;
 
@@ -373,7 +390,7 @@ function runCli(array $argv, array $feeds): void
     }
 
     if ($build || !is_file(playgroundXlsxPath())) {
-        $path = buildPlaygroundXlsx($feeds);
+        $path = buildPlaygroundXlsx(generateFeeds());
         echo "Wrote {$path}\n";
         echo "OData URL: " . playgroundServiceRoot() . '/' . PLAYGROUND_FEED_ID . "/Employees\n";
         echo "Start server: php -S localhost:" . PLAYGROUND_PORT . " playground.php\n";
@@ -390,7 +407,7 @@ function runCli(array $argv, array $feeds): void
 // =============================================================================
 
 if (PHP_SAPI === 'cli') {
-    runCli($argv, $feeds);
+    runCli($argv);
 }
 
 $path = playgroundRequestPath();
@@ -398,7 +415,7 @@ $path = playgroundRequestPath();
 try {
     if ($path === '/playground.xlsx') {
         if (!is_file(playgroundXlsxPath())) {
-            buildPlaygroundXlsx($feeds);
+            buildPlaygroundXlsx(generateFeeds());
         }
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -413,11 +430,11 @@ try {
     }
 
     if (strpos($path, '/odata') === 0) {
-        handleODataRequest($feeds, $username, $password);
+        handleODataRequest(generateFeeds(), $username, $password);
         exit;
     }
 
-    renderHomePage($feeds, $username);
+    renderHomePage(generateFeeds(), $username);
 } catch (Throwable $e) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
