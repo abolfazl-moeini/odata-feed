@@ -1,0 +1,40 @@
+CHANGELOG — wpdev/odata-feed
+============================
+
+Format: Keep a Changelog (plain text)
+Versioning: Semantic Versioning (https://semver.org)
+
+
+[1.0.1] - 2026-06-17
+--------------------
+
+Changed
+  - License changed from MIT to GNU General Public License v2.0 or later
+    (GPL-2.0-or-later)
+
+
+[1.0.0] - 2026-06-17
+--------------------
+
+Added
+  - LiveXlsxWriter: refreshable Power Query OData workbook via Excel-authored
+    template (resources/live-template.xlsx)
+  - FeedConfig value object (baseUrl, feedId, entitySet)
+  - ConnectionBuilder for path-segment OData URLs
+  - DataMashupRewriter for repointing OData URL inside DataMashup (UTF-16 + MS-QDEFF)
+  - LiveXlsxWriter Spreadsheet constructor and fromFile() factory
+  - FeedRepositoryInterface with InMemoryFeedRepository for optional metadata
+  - PHPUnit test suite (URL construction, config validation, DataMashup, security)
+  - Example 1: minimal writer demo (examples/example-1/build.php)
+  - Example 2: live OData playground (examples/example-2/playground.php)
+
+Security
+  - No authentication tokens or passwords stored inside generated .xlsx files
+  - savePassword="0" in all connection definitions
+  - Excel prompts for credentials on refresh; stored in OS credential manager
+
+Requirements
+  - PHP >= 7.4
+  - ext-zip
+  - phpoffice/phpspreadsheet ^1.29
+  - wpdev/phpspreadsheet-odata ^1.0
