@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LiveXlsxWriter` with `Spreadsheet` constructor and `fromFile()` static factory
 - `FeedRepositoryInterface` with `InMemoryFeedRepository` for optional feed metadata persistence
 - PHPUnit test suite covering URL construction, config validation, DataMashup URL substitution, and security
-- Example script (`examples/build.php`)
+- Example scripts (`examples/example-1/build.php`, `examples/example-2/playground.php`)
 
 ### Security
 

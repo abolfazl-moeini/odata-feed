@@ -1,0 +1,24 @@
+# odata-feed example-2 — Apache URL rewrite
+#
+# Deploy this folder (playground.php, vendor/, .htaccess, composer.json).
+# If the app lives in a subdirectory, set RewriteBase to match (e.g. /my-app/).
+#
+# REQUIRES PHP 7.4+ (match MultiPHP Manager / Select PHP Version in cPanel).
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Change this if the app is not at the domain root (no trailing slash).
+    RewriteBase /
+
+    RewriteRule ^vendor(/|$) - [F,L]
+    RewriteRule ^composer\.(json|lock)$ - [F,L]
+
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    RewriteRule ^ playground.php [L,QSA]
+</IfModule>
+
+DirectoryIndex playground.php

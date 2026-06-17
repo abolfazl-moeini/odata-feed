@@ -76,5 +76,5 @@ composer test
 ## Example
 
 ```bash
-php examples/build.php
+php examples/example-1/build.php
 ```

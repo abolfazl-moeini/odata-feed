@@ -46,11 +46,24 @@ $writer->setFeed(new FeedConfig('https://api.example.com/odata', 'abc123', 'Sale
 $writer->write('output.xlsx');
 ```
 
-Run the included example:
+### Examples
+
+**Example 1** — minimal writer demo (static OData URL):
 
 ```bash
-php examples/build.php
+php examples/example-1/build.php
 ```
+
+**Example 2** — full live refresh playground (OData server + Excel workbook):
+
+```bash
+cd examples/example-2
+composer install
+php playground.php --build
+php -S localhost:8080 playground.php
+```
+
+Edit `$feeds` in `playground.php`, save, then refresh the workbook in Excel. Re-run `--build` only when sheet names, `feedId`, or the OData base URL change. For subdirectory hosting, pass `--base-url` or set `PLAYGROUND_BASE_URL` when building.
 
 ## Feed configuration
 

@@ -160,10 +160,16 @@ Coverage expectations:
 
 Test namespace: `WPDev\ODataFeed\Tests\`
 
-## Example
+## Examples
 
 ```bash
-php examples/build.php
+# Minimal writer demo
+php examples/example-1/build.php
+
+# Live OData + Excel refresh playground
+cd examples/example-2 && composer install
+php playground.php --build
+php -S localhost:8080 playground.php
 ```
 
 ```php

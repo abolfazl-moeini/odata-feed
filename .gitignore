@@ -1,7 +1,9 @@
 /vendor/
+/examples/**/vendor/
 /.phpunit.cache/
 .DS_Store
 composer.lock
+/examples/**/composer.lock
 *.xlsx
 !tests/fixtures/*.xlsx
 !/resources/live-template.xlsx
