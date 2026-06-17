@@ -11,15 +11,15 @@ When a user opens the file in Excel and clicks **Refresh**, Excel re-fetches liv
 - **Composer package:** `wpdev/odata-feed`
 - **Namespace:** `WPDev\ODataFeed`
 - **GitHub:** `git@github.com:abolfazl-moeini/odata-feed.git`
-- **PHP:** **8.1 minimum** (`composer.json`: `"php": ">=8.1"`)
+- **PHP:** **7.4 minimum** (`composer.json`: `"php": ">=7.4"`)
 - PSR-4, PSR-12
 - **No** Laravel/Symfony dependency
 
 ## PHP version requirement (critical)
 
-- **Minimum PHP version: 8.1**
-- `composer.json` constraint: `"php": ">=8.1"`
-- CI tests PHP 8.1–8.4
+- **Minimum PHP version: 7.4**
+- `composer.json` constraint: `"php": ">=7.4"`
+- CI tests PHP 7.4 and 8.1–8.4
 
 ## Companion package (Package 1)
 
@@ -191,7 +191,7 @@ $writer->save('output.xlsx');
 
 ## Conventions for agents
 
-- **PHP 8.1+** per `composer.json`; run `composer lint` before finishing.
+- **PHP 7.4+** per `composer.json`; run `composer lint` before finishing.
 - **Do not** add Laravel/Symfony/framework coupling.
 - **Do not** store credentials in generated xlsx files.
 - **Keep** `{feedId}` in the URL path segment in all connection approaches.
@@ -204,8 +204,8 @@ $writer->save('output.xlsx');
 ## Dependencies
 
 ```json
-"php": ">=8.1",
-        "phpoffice/phpspreadsheet": "^2.0|^3.0",
+"php": ">=7.4",
+        "phpoffice/phpspreadsheet": "^1.29",
 "wpdev/phpspreadsheet-odata": "^1.0",
 "ext-zip": "*"
 ```

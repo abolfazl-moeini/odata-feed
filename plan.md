@@ -6,7 +6,7 @@ Framework-agnostic PHP library that embeds a live OData connection into `.xlsx` 
 
 | Area | Target |
 |------|--------|
-| PHP | **>= 8.1** |
+| PHP | **>= 7.4** |
 | Companion | `wpdev/phpspreadsheet-odata ^1.0` (URL shape alignment) |
 | Security | No credentials stored in generated files |
 | Style | PSR-4, PSR-12, `declare(strict_types=1)` |
