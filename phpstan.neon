@@ -1,0 +1,9 @@
+parameters:
+    level: 6
+    paths:
+        - src
+    phpVersion: 80200
+    bootstrapFiles:
+        - vendor/autoload.php
+    scanDirectories:
+        - vendor/phpoffice/phpspreadsheet/src

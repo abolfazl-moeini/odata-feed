@@ -302,10 +302,12 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         $name = preg_quote(htmlspecialchars($entitySet, ENT_QUOTES | ENT_XML1, 'UTF-8'), '/');
 
         // Try both attribute orderings: name-before-rid and rid-before-name.
-        foreach ([
+        foreach (
+            [
             '/<sheet\b[^>]*\bname="' . $name . '"[^>]*\br:id="([^"]+)"/',
             '/<sheet\b[^>]*\br:id="([^"]+)"[^>]*\bname="' . $name . '"/',
-        ] as $pattern) {
+            ] as $pattern
+        ) {
             if (preg_match($pattern, $workbookXml, $matches)) {
                 return $matches[1];
             }

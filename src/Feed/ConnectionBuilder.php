@@ -11,7 +11,7 @@ final class ConnectionBuilder
     public function buildUrl(FeedConfigInterface $config): string
     {
         $baseUrl = rtrim($config->getBaseUrl(), '/');
-        $feedId = rawurlencode($config->getFeedId());
+        $feedId = $config->getFeedId();
         $entitySet = rawurlencode($config->getEntitySet());
 
         return $baseUrl

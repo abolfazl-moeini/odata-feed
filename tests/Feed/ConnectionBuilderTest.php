@@ -32,13 +32,24 @@ final class ConnectionBuilderTest extends TestCase
         );
     }
 
-    public function testEncodesSpecialCharactersInPathSegments(): void
+    public function testEncodesEntitySetButNotFeedId(): void
     {
-        $config = new FeedConfig('https://api.example.com/odata', 'tenant 1', 'Sales/Data');
+        $config = new FeedConfig('https://api.example.com/odata', 'tenant-1', 'Sales/Data');
         $builder = new ConnectionBuilder();
 
         $this->assertSame(
-            'https://api.example.com/odata/tenant%201/Sales%2FData',
+            'https://api.example.com/odata/tenant-1/Sales%2FData',
+            $builder->buildUrl($config)
+        );
+    }
+
+    public function testFeedIdIsNotUrlEncoded(): void
+    {
+        $config = new FeedConfig('https://api.example.com/odata', 'tenant_42-beta', 'Products');
+        $builder = new ConnectionBuilder();
+
+        $this->assertSame(
+            'https://api.example.com/odata/tenant_42-beta/Products',
             $builder->buildUrl($config)
         );
     }
