@@ -214,4 +214,4 @@ Package 1 is a declared dependency for stack alignment; the writer itself only n
 
 ## License
 
-MIT (see `LICENSE` in repo root).
+GPL-2.0-or-later (see `LICENSE` in repo root).

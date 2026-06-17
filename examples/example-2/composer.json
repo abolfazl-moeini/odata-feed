@@ -2,7 +2,7 @@
     "name": "wpdev/odata-feed-example-2",
     "description": "Live OData + Excel refresh playground for odata-feed and phpspreadsheet-odata",
     "type": "project",
-    "license": "MIT",
+    "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=7.4",
         "wpdev/phpspreadsheet-odata": "*",
