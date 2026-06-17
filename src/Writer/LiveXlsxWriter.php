@@ -274,8 +274,13 @@ XML;
             return;
         }
 
-        if (strpos($content, '<tableParts') === false) {
-            $tablePartRef = '<tableParts count="1"><tablePart r:id="rIdTable1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></tableParts>';
+        $tablePartRef = '<tableParts count="1"><tablePart r:id="rIdTable1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></tableParts>';
+
+        if (preg_match('/<tableParts\b[^>]*\/>/', $content) === 1) {
+            $content = (string) preg_replace('/<tableParts\b[^>]*\/>/', $tablePartRef, $content);
+        } elseif (preg_match('/<tableParts\b[^>]*>.*?<\/tableParts>/s', $content) === 1) {
+            $content = (string) preg_replace('/<tableParts\b[^>]*>.*?<\/tableParts>/s', $tablePartRef, $content);
+        } else {
             $content = str_replace('</worksheet>', $tablePartRef . '</worksheet>', $content);
         }
 

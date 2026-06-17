@@ -70,7 +70,7 @@ XML;
 
         return <<<XML
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="ExternalData_1" displayName="ExternalData_1" ref="{$ref}" tableType="queryTable" totalsRowShown="0">
+<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="ExternalData_1" displayName="ExternalData_1" ref="{$ref}" headerRowCount="1" tableType="queryTable" totalsRowShown="0">
   <autoFilter ref="{$ref}"/>
   <tableColumns count="{$count}">
     {$columns}

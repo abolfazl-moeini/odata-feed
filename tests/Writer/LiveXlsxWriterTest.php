@@ -98,6 +98,12 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertNotFalse($itemProps);
         $this->assertStringContainsString('schemas.microsoft.com/DataMashup', $itemProps);
 
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $this->assertNotFalse($sheet);
+        $this->assertStringContainsString('<tableParts count="1">', $sheet);
+        $this->assertStringContainsString('r:id="rIdTable1"', $sheet);
+        $this->assertStringNotContainsString('<tableParts count="0"', $sheet);
+
         $sheetRels = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
         $this->assertNotFalse($sheetRels, 'sheet rels should exist');
         $this->assertStringContainsString('rIdTable1', $sheetRels);
