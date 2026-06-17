@@ -99,8 +99,13 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         $worksheet = $this->findWorksheet($entitySet);
 
         if ($worksheet === null) {
-            $worksheet = $this->spreadsheet->createSheet();
-            $worksheet->setTitle($entitySet);
+            if ($this->spreadsheet->getSheetCount() === 1) {
+                $worksheet = $this->spreadsheet->getActiveSheet();
+                $worksheet->setTitle($entitySet);
+            } else {
+                $worksheet = $this->spreadsheet->createSheet();
+                $worksheet->setTitle($entitySet);
+            }
         }
 
         $this->spreadsheet->setActiveSheetIndex(
@@ -157,7 +162,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         ];
 
         foreach ($newOverrides as $partMarker => $override) {
-            if (!str_contains($content, $partMarker)) {
+            if (strpos($content, $partMarker) === false) {
                 $content = str_replace('</Types>', $override . '</Types>', $content);
             }
         }
@@ -180,7 +185,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
 
         foreach ($relationships as $relationship) {
             $id = $this->extractRelId($relationship);
-            if ($id === null || !str_contains($content, 'Id="' . $id . '"')) {
+            if ($id === null || strpos($content, 'Id="' . $id . '"') === false) {
                 $content = $this->appendRelationship($content, $relationship);
             }
         }
@@ -203,7 +208,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             throw new RuntimeException('Missing xl/workbook.xml in workbook.');
         }
 
-        if (!str_contains($content, '<connections>')) {
+        if (strpos($content, '<connections>') === false) {
             $content = str_replace(
                 '</workbook>',
                 '<connections><connection r:id="rIdConnections"/></connections></workbook>',
@@ -226,7 +231,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             return;
         }
 
-        if (!str_contains($content, '<queryTable')) {
+        if (strpos($content, '<queryTable') === false) {
             $queryTableRef = '<tableParts count="1"><tablePart r:id="rIdQueryTable1" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/></tableParts>';
             $content = str_replace('</worksheet>', $queryTableRef . '</worksheet>', $content);
         }
@@ -240,7 +245,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         }
 
         $relationship = '<Relationship Id="rIdQueryTable1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable" Target="../queryTables/queryTable1.xml"/>';
-        if (!str_contains($relsContent, 'rIdQueryTable1')) {
+        if (strpos($relsContent, 'rIdQueryTable1') === false) {
             $relsContent = $this->appendRelationship($relsContent, $relationship);
         }
 
@@ -251,16 +256,16 @@ final class LiveXlsxWriter implements XlsxWriterInterface
     {
         // Normalize self-closing empty Relationships tag to open/close form so we can append
         if (preg_match('#<Relationships([^>]*)?/>#', $relsXml)) {
-            $relsXml = preg_replace('#<Relationships([^>]*)?/>#', '<Relationships$1></Relationships>', $relsXml);
+            $relsXml = (string) preg_replace('#<Relationships([^>]*)?/>#', '<Relationships$1></Relationships>', $relsXml);
         }
 
-        if (str_contains($relsXml, '</Relationships>')) {
+        if (strpos($relsXml, '</Relationships>') !== false) {
             return str_replace('</Relationships>', $relationship . '</Relationships>', $relsXml);
         }
 
         // Fallback: append inside or wrap
-        if (str_contains($relsXml, '<Relationships')) {
-            return preg_replace('#(</Relationships>)?$#', $relationship . '</Relationships>', $relsXml, 1);
+        if (strpos($relsXml, '<Relationships') !== false) {
+            return (string) preg_replace('#(</Relationships>)?$#', $relationship . '</Relationships>', $relsXml, 1);
         }
 
         return $relsXml;
@@ -273,8 +278,10 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             return null;
         }
 
-        if (!preg_match('/<sheet[^>]+name="' . preg_quote($entitySet, '/') . '"[^>]+r:id="([^"]+)"/', $workbook, $matches)) {
-            if (preg_match('/<sheet[^>]+r:id="([^"]+)"[^>]+name="' . preg_quote($entitySet, '/') . '"/', $workbook, $matches)) {
+        $escapedEntitySet = htmlspecialchars($entitySet, ENT_QUOTES | ENT_XML1, 'UTF-8');
+
+        if (!preg_match('/<sheet[^>]+name="' . preg_quote($escapedEntitySet, '/') . '"[^>]+r:id="([^"]+)"/', $workbook, $matches)) {
+            if (preg_match('/<sheet[^>]+r:id="([^"]+)"[^>]+name="' . preg_quote($escapedEntitySet, '/') . '"/', $workbook, $matches)) {
                 // matched reversed attribute order
             } else {
                 return 'xl/worksheets/sheet1.xml';

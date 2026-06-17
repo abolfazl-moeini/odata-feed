@@ -136,6 +136,59 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertFileExists($output);
     }
 
+    public function testSingleWorksheetIsRenamed(): void
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Sheet1');
+        $sheet->fromArray(['Col1', 'Col2'], null, 'A1');
+
+        $config = new FeedConfig('https://api.example.com/odata', 'tenant-1', 'Sales');
+        $output = $this->tempDir . '/rename-single.xlsx';
+
+        $writer = new LiveXlsxWriter($spreadsheet);
+        $writer->setFeed($config);
+        $writer->write($output);
+
+        $this->assertFileExists($output);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($output) === true);
+
+        $workbook = $zip->getFromName('xl/workbook.xml');
+        $this->assertNotFalse($workbook);
+        $this->assertStringContainsString('name="Sales"', $workbook);
+        $this->assertStringNotContainsString('name="Sheet1"', $workbook);
+
+        $zip->close();
+    }
+
+    public function testResolvesSheetPathWithXmlSpecialCharacters(): void
+    {
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Sales & Marketing');
+        $sheet->fromArray(['Col1', 'Col2'], null, 'A1');
+
+        $config = new FeedConfig('https://api.example.com/odata', 'tenant-1', 'Sales & Marketing');
+        $output = $this->tempDir . '/xml-special-chars.xlsx';
+
+        $writer = new LiveXlsxWriter($spreadsheet);
+        $writer->setFeed($config);
+        $writer->write($output);
+
+        $this->assertFileExists($output);
+
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($output) === true);
+
+        $relsContent = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
+        $this->assertNotFalse($relsContent, 'sheet rels must exist');
+        $this->assertStringContainsString('rIdQueryTable1', $relsContent);
+
+        $zip->close();
+    }
+
     private function createSampleSpreadsheet(): Spreadsheet
     {
         $spreadsheet = new Spreadsheet();
