@@ -63,13 +63,23 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertStringNotContainsString('basic auth', $lowerContents);
         $this->assertDoesNotMatchRegularExpression('/savepassword="1"/i', $allContents);
 
-        // Ensure sheet rels has the queryTable relationship (critical for refresh to target the sheet)
+        // Sheet rels must carry the queryTable relationship (Excel needs this to wire refresh).
         $sheetRels = $zip->getFromName('xl/worksheets/_rels/sheet1.xml.rels');
         $this->assertNotFalse($sheetRels, 'sheet rels should exist');
         $this->assertStringContainsString('rIdQueryTable1', $sheetRels);
         $this->assertStringContainsString('queryTable', $sheetRels);
 
-        // Ensure we do not emit a broken rels pointing to non-existent bin for DataMashup
+        // queryTable relationships belong only at sheet level, not in workbook rels.
+        $workbookRels = $zip->getFromName('xl/_rels/workbook.xml.rels');
+        $this->assertNotFalse($workbookRels, 'workbook rels should exist');
+        $this->assertStringNotContainsString('queryTable', $workbookRels);
+
+        // customXml/item1.xml must contain the raw DataMashup binary, not a base64-wrapped XML document.
+        $dataMashup = $zip->getFromName('customXml/item1.xml');
+        $this->assertNotFalse($dataMashup, 'customXml/item1.xml must exist');
+        $this->assertNotSame('<?xml', substr((string) $dataMashup, 0, 5), 'DataMashup part must be raw binary, not XML');
+
+        // No broken rels pointing to a non-existent DataMashup "bin" entry.
         $this->assertFalse($zip->getFromName('customXml/_rels/item1.xml.rels'), 'should not create customXml rels to non-existent bin');
 
         $zip->close();

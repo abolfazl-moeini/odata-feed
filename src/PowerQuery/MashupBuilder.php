@@ -67,31 +67,6 @@ XML;
 XML;
     }
 
-    public function buildDataMashupCustomXml(FeedConfigInterface $config): string
-    {
-        $binary = $this->buildDataMashupBinary($config);
-        $encoded = base64_encode($binary);
-
-        return <<<XML
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<DataMashup xmlns="http://schemas.microsoft.com/DataMashup">
-  <Version>1.0</Version>
-  <Culture>en-US</Culture>
-  <DataMashup>{$encoded}</DataMashup>
-</DataMashup>
-XML;
-    }
-
-    public function buildCustomXmlRels(): string
-    {
-        return <<<XML
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.microsoft.com/office/2011/relationships/dataMashup" Target="bin" TargetMode="Internal"/>
-</Relationships>
-XML;
-    }
-
     public function buildDataMashupBinary(FeedConfigInterface $config): string
     {
         $queryName = $this->sanitizeQueryName($config->getEntitySet());
@@ -138,7 +113,7 @@ XML;
 
     private function buildMetadataXml(string $queryName): string
     {
-        $encodedName = rawurlencode('Section1/' . $queryName);
+        $formulaName = 'Section1/' . $queryName;
 
         return <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
@@ -148,7 +123,7 @@ XML;
   </AllFormulas>
   <Formulas>
     <FormulaItem>
-      <Name>{$encodedName}</Name>
+      <Name>{$formulaName}</Name>
       <ContentType>x-ms/mdso</ContentType>
       <IsEvaluable>true</IsEvaluable>
       <LoadToReport>true</LoadToReport>
@@ -169,9 +144,12 @@ XML;
             throw new RuntimeException('Unable to create temporary file for DataMashup package parts.');
         }
 
+        // Remove the placeholder file tempnam() created so ZipArchive starts a fresh archive.
+        // ZipArchive::OVERWRITE requires PHP 8.0+; unlink + CREATE works on PHP 7.4+.
+        unlink($tempFile);
+
         $zip = new ZipArchive();
-        if ($zip->open($tempFile, ZipArchive::OVERWRITE | ZipArchive::CREATE) !== true) {
-            unlink($tempFile);
+        if ($zip->open($tempFile, ZipArchive::CREATE) !== true) {
             throw new RuntimeException('Unable to create DataMashup package parts archive.');
         }
 

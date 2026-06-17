@@ -133,10 +133,9 @@ final class LiveXlsxWriter implements XlsxWriterInterface
 
         $zip->addFromString('xl/connections.xml', $this->mashupBuilder->buildConnectionsXml($feed));
         $zip->addFromString('xl/queryTables/queryTable1.xml', $this->mashupBuilder->buildQueryTableXml());
-        $zip->addFromString('customXml/item1.xml', $this->mashupBuilder->buildDataMashupCustomXml($feed));
-        // Note: We do not add customXml/_rels/item1.xml.rels here because the DataMashup
-        // payload is embedded inline in item1.xml. A rels pointing to a non-existent "bin"
-        // would create an invalid package reference.
+        // customXml/item1.xml holds the raw DataMashup binary (not XML); the file extension
+        // is required by the OPC spec but the content is opaque binary understood only by Excel.
+        $zip->addFromString('customXml/item1.xml', $this->mashupBuilder->buildDataMashupBinary($feed));
 
         $this->updateContentTypes($zip);
         $this->updateWorkbookRels($zip);
@@ -158,7 +157,7 @@ final class LiveXlsxWriter implements XlsxWriterInterface
         $newOverrides = [
             'PartName="/xl/connections.xml"' => '<Override PartName="/xl/connections.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.connections+xml"/>',
             'PartName="/xl/queryTables/queryTable1.xml"' => '<Override PartName="/xl/queryTables/queryTable1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.queryTable+xml"/>',
-            'PartName="/customXml/item1.xml"' => '<Override PartName="/customXml/item1.xml" ContentType="application/xml"/>',
+            'PartName="/customXml/item1.xml"' => '<Override PartName="/customXml/item1.xml" ContentType="application/vnd.ms-excel.dataMashup"/>',
         ];
 
         foreach ($newOverrides as $partMarker => $override) {
@@ -177,9 +176,9 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             throw new RuntimeException('Missing xl/_rels/workbook.xml.rels in workbook.');
         }
 
+        // queryTable relationships live in the sheet rels file, not in workbook.xml.rels.
         $relationships = [
             '<Relationship Id="rIdConnections" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/connections" Target="connections.xml"/>',
-            '<Relationship Id="rIdQueryTable1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable" Target="queryTables/queryTable1.xml"/>',
             '<Relationship Id="rIdCustomXml1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml" Target="../customXml/item1.xml"/>',
         ];
 
@@ -278,14 +277,9 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             return null;
         }
 
-        $escapedEntitySet = htmlspecialchars($entitySet, ENT_QUOTES | ENT_XML1, 'UTF-8');
-
-        if (!preg_match('/<sheet[^>]+name="' . preg_quote($escapedEntitySet, '/') . '"[^>]+r:id="([^"]+)"/', $workbook, $matches)) {
-            if (preg_match('/<sheet[^>]+r:id="([^"]+)"[^>]+name="' . preg_quote($escapedEntitySet, '/') . '"/', $workbook, $matches)) {
-                // matched reversed attribute order
-            } else {
-                return 'xl/worksheets/sheet1.xml';
-            }
+        $rid = $this->extractSheetRid($workbook, $entitySet);
+        if ($rid === null) {
+            return 'xl/worksheets/sheet1.xml';
         }
 
         $rels = $zip->getFromName('xl/_rels/workbook.xml.rels');
@@ -293,12 +287,31 @@ final class LiveXlsxWriter implements XlsxWriterInterface
             return 'xl/worksheets/sheet1.xml';
         }
 
-        $rid = $matches[1];
-        if (!preg_match('/<Relationship Id="' . preg_quote($rid, '/') . '"[^>]+Target="([^"]+)"/', $rels, $targetMatches)) {
+        if (!preg_match('/<Relationship\b[^>]*\bId="' . preg_quote($rid, '/') . '"[^>]*\bTarget="([^"]+)"/', $rels, $targetMatches)) {
             return 'xl/worksheets/sheet1.xml';
         }
 
-        return 'xl/' . $targetMatches[1];
+        $target = $targetMatches[1];
+
+        // Target may be absolute (/xl/worksheets/sheet1.xml) or relative (worksheets/sheet1.xml).
+        return strpos($target, '/') === 0 ? ltrim($target, '/') : 'xl/' . $target;
+    }
+
+    private function extractSheetRid(string $workbookXml, string $entitySet): ?string
+    {
+        $name = preg_quote(htmlspecialchars($entitySet, ENT_QUOTES | ENT_XML1, 'UTF-8'), '/');
+
+        // Try both attribute orderings: name-before-rid and rid-before-name.
+        foreach ([
+            '/<sheet\b[^>]*\bname="' . $name . '"[^>]*\br:id="([^"]+)"/',
+            '/<sheet\b[^>]*\br:id="([^"]+)"[^>]*\bname="' . $name . '"/',
+        ] as $pattern) {
+            if (preg_match($pattern, $workbookXml, $matches)) {
+                return $matches[1];
+            }
+        }
+
+        return null;
     }
 
     private function persistFeedMetadata(FeedConfigInterface $feed): void
