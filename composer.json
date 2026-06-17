@@ -3,13 +3,30 @@
     "description": "Embeds a Power Query OData connection into PhpSpreadsheet workbooks for live Excel refresh",
     "type": "library",
     "license": "MIT",
+    "keywords": [
+        "odata",
+        "power-query",
+        "datamashup",
+        "excel",
+        "xlsx",
+        "phpspreadsheet",
+        "live-refresh"
+    ],
+    "authors": [
+        {
+            "name": "WPDev",
+            "homepage": "https://github.com/wpdev"
+        }
+    ],
     "require": {
         "php": ">=7.4",
         "phpoffice/phpspreadsheet": "^1.29|^2.0|^3.0|^4.0|^5.0",
+        "wpdev/phpspreadsheet-odata": "^1.0",
         "ext-zip": "*"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.6|^10.5|^11.0"
+        "phpunit/phpunit": "^9.6|^10.5|^11.0",
+        "phpstan/phpstan": "^1.10|^2.2"
     },
     "autoload": {
         "psr-4": {
@@ -20,6 +37,13 @@
         "psr-4": {
             "WPDev\\ODataFeed\\Tests\\": "tests/"
         }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "phpstan": "phpstan analyse --memory-limit=512M"
+    },
+    "config": {
+        "sort-packages": true
     },
     "minimum-stability": "stable",
     "prefer-stable": true

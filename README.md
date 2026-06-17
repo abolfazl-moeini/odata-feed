@@ -6,7 +6,7 @@ This package is **Package 2** in the excel-kit stack. It pairs with the OData en
 
 ## Requirements
 
-- PHP 8.1+
+- **PHP 7.4 or greater** (minimum PHP 7.4; must remain compatible with PHP 7.4+)
 - `ext-zip`
 - [phpoffice/phpspreadsheet](https://github.com/PHPOffice/PhpSpreadsheet)
 
