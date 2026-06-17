@@ -23,7 +23,7 @@ if (PHP_SAPI !== 'cli') {
  *   php playground.php --build          # (re)generate playground.xlsx
  *   php -S localhost:8080 playground.php
  *
- * Open playground.xlsx in Excel → Data → Refresh All.
+ * Open playground.xlsx in Excel → Data → Refresh All (enter Basic credentials).
  * Change the arrays, save this file, refresh Excel again — no rebuild needed
  * for OData (the server reads $feeds on every request). Re-run --build only
  * if you change sheet names, feedId, or the OData base URL/port.
@@ -48,6 +48,23 @@ require __DIR__ . '/vendor/autoload.php';
 
 const PLAYGROUND_FEED_ID = 'demo';
 const PLAYGROUND_PORT = 8080;
+
+/**
+ * HTTP Basic credentials for the OData feed. Excel prompts on refresh; credentials
+ * are stored in the OS keychain, never in the workbook. On shared hosting you can
+ * override with ODATA_USER / ODATA_PASS env vars instead of editing this file.
+ */
+$username = 'demo';
+$password = 'demo';
+
+$envUser = getenv('ODATA_USER');
+$envPass = getenv('ODATA_PASS');
+if ($envUser !== false && $envUser !== '') {
+    $username = $envUser;
+}
+if ($envPass !== false && $envPass !== '') {
+    $password = $envPass;
+}
 
 /** @var array<string, array<string, list<list<mixed>>>> */
 $feeds = [
@@ -216,9 +233,42 @@ function buildPlaygroundXlsx(array $feeds): string
     return $outputPath;
 }
 
-function handleODataRequest(array $feeds): void
+function normalizeAuthorizationHeader(): void
 {
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        return;
+    }
+
+    if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        $_SERVER['HTTP_AUTHORIZATION'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+
+        return;
+    }
+
+    if (function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        if (isset($headers['Authorization'])) {
+            $_SERVER['HTTP_AUTHORIZATION'] = $headers['Authorization'];
+
+            return;
+        }
+    }
+
+    if (!empty($_SERVER['PHP_AUTH_USER'])) {
+        $_SERVER['HTTP_AUTHORIZATION'] = 'Basic ' . base64_encode(
+            $_SERVER['PHP_AUTH_USER'] . ':' . ($_SERVER['PHP_AUTH_PW'] ?? '')
+        );
+    }
+}
+
+function handleODataRequest(array $feeds, string $username, string $password): void
+{
+    normalizeAuthorizationHeader();
+
     $server = new ODataServer(buildFeedResolver($feeds), playgroundServiceRoot());
+    $server->useBasicAuth(static function (string $user, string $pass) use ($username, $password): bool {
+        return hash_equals($username, $user) && hash_equals($password, $pass);
+    });
     $response = $server->handle(ServerRequest::fromGlobals());
 
     http_response_code($response->getStatusCode());
@@ -232,7 +282,7 @@ function handleODataRequest(array $feeds): void
     echo (string) $response->getBody();
 }
 
-function renderHomePage(array $feeds): void
+function renderHomePage(array $feeds, string $username): void
 {
     $base = playgroundServiceRoot();
     $feedId = PLAYGROUND_FEED_ID;
@@ -248,6 +298,8 @@ function renderHomePage(array $feeds): void
 
     echo '<h1>odata-feed playground</h1>';
     echo '<p>Edit <code>$feeds</code> in <code>playground.php</code>, save, then refresh Excel.</p>';
+    echo '<p>OData is protected with <strong>HTTP Basic</strong> auth (user <code>'
+        . htmlspecialchars($username, ENT_QUOTES) . '</code>). Excel prompts on refresh.</p>';
 
     echo '<h2>Quick links</h2><ul>';
     echo '<li><a href="' . htmlspecialchars(playgroundUrl('/odata'), ENT_QUOTES) . '">Service document</a></li>';
@@ -271,8 +323,8 @@ function renderHomePage(array $feeds): void
     echo '<li><code>php playground.php --build</code> (first time, or after URL/sheet renames)</li>';
     echo '<li>Run <code>php -S localhost:' . PLAYGROUND_PORT . ' playground.php</code> locally (or deploy with <code>.htaccess</code>)</li>';
     echo '<li>Open <code>playground.xlsx</code> in Excel</li>';
-    echo '<li>Change a value in <code>$feeds</code> above, save <code>playground.php</code></li>';
-    echo '<li>In Excel: <strong>Data → Refresh All</strong> — rows should match the new arrays</li>';
+    echo '<li><strong>Data → Refresh All</strong> — enter Basic credentials when prompted</li>';
+    echo '<li>Change a value in <code>$feeds</code> above, save <code>playground.php</code>, refresh again</li>';
     echo '</ol>';
 
     echo '<h2>Current feed data (preview)</h2><pre>';
@@ -361,11 +413,11 @@ try {
     }
 
     if (strpos($path, '/odata') === 0) {
-        handleODataRequest($feeds);
+        handleODataRequest($feeds, $username, $password);
         exit;
     }
 
-    renderHomePage($feeds);
+    renderHomePage($feeds, $username);
 } catch (Throwable $e) {
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');

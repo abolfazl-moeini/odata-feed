@@ -63,7 +63,7 @@ php playground.php --build
 php -S localhost:8080 playground.php
 ```
 
-Edit `$feeds` in `playground.php`, save, then refresh the workbook in Excel. Re-run `--build` only when sheet names, `feedId`, or the OData base URL change. For subdirectory hosting, pass `--base-url` or set `PLAYGROUND_BASE_URL` when building.
+Edit `$feeds` in `playground.php`, save, then refresh the workbook in Excel. The playground enables HTTP Basic auth (`$username` / `$password`) so Excel prompts for credentials on refresh — nothing is stored in the `.xlsx`. Re-run `--build` only when sheet names, `feedId`, or the OData base URL change. For subdirectory hosting, pass `--base-url` or set `PLAYGROUND_BASE_URL` when building.
 
 ## Feed configuration
 

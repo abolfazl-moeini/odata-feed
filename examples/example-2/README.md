@@ -25,9 +25,36 @@ php -S localhost:8080 playground.php
 ```
 
 1. Open `playground.xlsx` in Excel.
-2. **Data → Refresh All** — the `Employees` table loads from the local OData server.
+2. **Data → Refresh All** — Excel prompts for **Basic** credentials (`demo` / `demo` by default).
 3. Edit the `$feeds` array in `playground.php`, save the file.
 4. Refresh Excel again — rows update without rebuilding the workbook.
+
+## Authentication
+
+The OData feed is protected with HTTP Basic auth. Edit credentials at the top of `playground.php`:
+
+```php
+$username = 'demo';
+$password = 'demo';
+```
+
+Excel shows a username/password dialog on refresh and stores credentials in the OS keychain — nothing is saved in the workbook.
+
+On shared hosting, set `ODATA_USER` and `ODATA_PASS` environment variables instead of committing real passwords.
+
+**HTTPS is required in production** — Basic auth sends reversible base64 encoding. `localhost` is fine for testing.
+
+If Excel cached anonymous access for this URL, update via **Data → Get Data → Data Source Settings → Edit Permissions → Credentials → Basic**.
+
+### Verify with curl
+
+```bash
+# 401 + WWW-Authenticate challenge
+curl -i http://localhost:8080/odata/demo/Employees | grep -iE 'HTTP/|WWW-Authenticate'
+
+# 200 with credentials
+curl -i -u demo:demo http://localhost:8080/odata/demo/Employees | head -1
+```
 
 ## Edit feed data
 

@@ -18,7 +18,8 @@
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    RewriteRule ^ playground.php [L,QSA]
+    # Pass Authorization through to PHP on FastCGI/CGI hosts (auth is enforced in playground.php).
+    RewriteRule ^ playground.php [L,QSA,E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 </IfModule>
 
 DirectoryIndex playground.php
