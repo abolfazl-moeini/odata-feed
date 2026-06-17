@@ -8,6 +8,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx as XlsxWriter;
 use PHPUnit\Framework\TestCase;
 use WPDev\ODataFeed\Feed\FeedConfig;
+use WPDev\ODataFeed\PowerQuery\DataMashupTemplate;
 use WPDev\ODataFeed\Repository\InMemoryFeedRepository;
 use WPDev\ODataFeed\Writer\LiveXlsxWriter;
 use ZipArchive;
@@ -55,6 +56,7 @@ final class LiveXlsxWriterTest extends TestCase
         $this->assertStringContainsString('type="5"', $connections);
         $this->assertStringContainsString('Microsoft.Mashup.OleDb.1', $connections);
         $this->assertStringContainsString('Sales', $connections);
+        $this->assertStringContainsString('model="0"', $connections);
 
         $allContents = $this->readAllZipContents($zip);
         $lowerContents = strtolower($allContents);
@@ -92,7 +94,9 @@ final class LiveXlsxWriterTest extends TestCase
         $dataMashup = $zip->getFromName('customXml/item1.xml');
         $this->assertNotFalse($dataMashup, 'customXml/item1.xml must exist');
         $this->assertStringContainsString('<DataMashup', $dataMashup);
-        $this->assertNotEmpty($this->extractDataMashupBinary((string) $dataMashup));
+        $binary = $this->extractDataMashupBinary((string) $dataMashup);
+        $this->assertNotEmpty($binary);
+        $this->assertDataMashupBinaryIsStructurallyValid($binary, 'https://api.example.com/odata/abc123/Sales');
 
         $itemProps = $zip->getFromName('customXml/itemProps1.xml');
         $this->assertNotFalse($itemProps);
@@ -264,6 +268,21 @@ final class LiveXlsxWriterTest extends TestCase
         $decoded = base64_decode(trim($matches[1]), true);
 
         return $decoded === false ? '' : $decoded;
+    }
+
+    private function assertDataMashupBinaryIsStructurallyValid(string $binary, string $expectedUrl): void
+    {
+        $sections = DataMashupTemplate::parseTopLevel($binary);
+        $this->assertGreaterThanOrEqual(1, strlen($sections['permissionBindings']));
+
+        $metadata = DataMashupTemplate::parseMetadataField($sections['metadata']);
+        $this->assertSame(0, $metadata['version']);
+        $this->assertStringContainsString('LocalPackageMetadataFile', $metadata['metadataXml']);
+
+        $extracted = DataMashupTemplate::extractPackageFormula($sections['packageParts']);
+        $this->assertContains('[Content_Types].xml', $extracted['names']);
+        $this->assertStringContainsString('OData.Feed(', $extracted['formula']);
+        $this->assertStringContainsString($expectedUrl, $extracted['formula']);
     }
 
     private function createSampleSpreadsheet(): Spreadsheet

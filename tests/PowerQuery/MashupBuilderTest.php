@@ -33,6 +33,7 @@ final class MashupBuilderTest extends TestCase
         $this->assertStringContainsString('<dbPr', $xml);
         $this->assertStringContainsString('Microsoft.Mashup.OleDb.1', $xml);
         $this->assertStringContainsString('Sales', $xml);
+        $this->assertStringContainsString('model="0"', $xml);
         $this->assertStringContainsString('savePassword="0"', $xml);
     }
 

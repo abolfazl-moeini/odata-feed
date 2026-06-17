@@ -13,9 +13,12 @@ final class MashupBuilder
 {
     private ConnectionBuilder $connectionBuilder;
 
-    public function __construct(?ConnectionBuilder $connectionBuilder = null)
+    private ?string $templatePath;
+
+    public function __construct(?ConnectionBuilder $connectionBuilder = null, ?string $templatePath = null)
     {
         $this->connectionBuilder = $connectionBuilder ?? new ConnectionBuilder();
+        $this->templatePath = $templatePath;
     }
 
     public function buildMFormula(FeedConfigInterface $config): string
@@ -47,7 +50,7 @@ M;
     <parameters/>
     <extLst>
       <ext uri="{AB39BE4F-830E-4394-839B-26F6AB2285C3}" xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main">
-        <x15:connection id="" model="1" excludeFromRefreshAll="0"/>
+        <x15:connection id="" model="0" excludeFromRefreshAll="0"/>
       </ext>
     </extLst>
   </connection>
@@ -133,34 +136,67 @@ XML;
 
     public function buildDataMashupBinary(FeedConfigInterface $config): string
     {
+        $templatePath = $this->templatePath ?? DataMashupTemplate::defaultPath();
+        if (is_file($templatePath)) {
+            return $this->buildDataMashupBinaryFromTemplate($config, $templatePath);
+        }
+
+        return $this->buildDataMashupBinaryFromScratch($config);
+    }
+
+    public function buildDataMashupBinaryFromScratch(FeedConfigInterface $config): string
+    {
         $queryName = $this->sanitizeQueryName($config->getEntitySet());
-        $mFormula = $this->buildMFormula($config);
 
         $packageParts = $this->createOpcZip([
+            '[Content_Types].xml' => $this->buildPackageContentTypesXml(),
             'Config/Package.xml' => $this->buildPackageXml(),
-            'Formulas/Section1.m' => $mFormula,
+            'Formulas/Section1.m' => $this->buildMFormula($config),
         ]);
 
         $permissions = $this->buildPermissionsXml();
-        $metadata = $this->buildMetadataXml($queryName);
-        $permissionBindings = '';
+        $metadata = DataMashupTemplate::buildMetadataField($this->buildMetadataXml($queryName));
+        $permissionBindings = "\x00";
 
         return pack('V', 0)
-            . $this->packSection($packageParts)
-            . $this->packSection($permissions)
-            . $this->packSection($metadata)
-            . $this->packSection($permissionBindings);
+            . pack('V', strlen($packageParts)) . $packageParts
+            . pack('V', strlen($permissions)) . $permissions
+            . pack('V', strlen($metadata)) . $metadata
+            . pack('V', strlen($permissionBindings)) . $permissionBindings;
+    }
+
+    public function buildDataMashupBinaryFromTemplate(FeedConfigInterface $config, string $templatePath): string
+    {
+        $queryName = $this->sanitizeQueryName($config->getEntitySet());
+        $template = DataMashupTemplate::fromFile($templatePath);
+
+        return $template->build(
+            $this->buildMFormula($config),
+            $this->buildMetadataXml($queryName)
+        );
+    }
+
+    private function buildPackageContentTypesXml(): string
+    {
+        return <<<XML
+<?xml version="1.0" encoding="utf-8"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="xml" ContentType="text/xml"/>
+  <Default Extension="m" ContentType="text/plain"/>
+  <Override PartName="/Config/Package.xml" ContentType="text/xml"/>
+</Types>
+XML;
     }
 
     private function buildPackageXml(): string
     {
         return <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<LocalPackageMetadataFile xmlns="http://schemas.microsoft.com/DataMashup">
+<Package xmlns="http://schemas.microsoft.com/DataMashup">
   <Version>1.0</Version>
   <MinVersion>1.0</MinVersion>
-  <Culture>en-US</Culture>
-</LocalPackageMetadataFile>
+  <Culture>en-us</Culture>
+</Package>
 XML;
     }
 
@@ -168,10 +204,10 @@ XML;
     {
         return <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<PermissionList xmlns="http://schemas.microsoft.com/DataMashup">
+<PermissionList xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://schemas.microsoft.com/DataMashup">
   <CanEvaluateFuturePackages>false</CanEvaluateFuturePackages>
   <FirewallEnabled>true</FirewallEnabled>
-  <WorkbookGroupType>None</WorkbookGroupType>
+  <WorkbookGroupType xsi:nil="true"/>
 </PermissionList>
 XML;
     }
@@ -183,9 +219,14 @@ XML;
         return <<<XML
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <LocalPackageMetadataFile xmlns="http://schemas.microsoft.com/DataMashup">
-  <AllFormulas>
-    <FormulaList/>
-  </AllFormulas>
+  <Items>
+    <Item>
+      <ItemLocation>
+        <ItemType>Formula</ItemType>
+        <ItemPath>{$formulaName}</ItemPath>
+      </ItemLocation>
+    </Item>
+  </Items>
   <Formulas>
     <FormulaItem>
       <Name>{$formulaName}</Name>
@@ -230,11 +271,6 @@ XML;
         }
 
         return $content;
-    }
-
-    private function packSection(string $payload): string
-    {
-        return pack('V', strlen($payload)) . $payload;
     }
 
     private function sanitizeQueryName(string $name): string
